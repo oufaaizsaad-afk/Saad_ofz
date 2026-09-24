@@ -625,6 +625,94 @@ table.tbl tr.picked td { background: var(--c-accent-soft); }
 
 .set-hero-preview { position: relative; border-radius: 14px; overflow: hidden; aspect-ratio: 16 / 10; background: #0E2230; }
 .set-hero-preview img, .set-hero-preview svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* ------------------------------------------------------------------ Dons */
+.don-heart {
+  width: 42px; height: 42px; flex: 0 0 42px; border-radius: 13px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, #F29056, #C4452C); box-shadow: 0 8px 18px rgba(196, 69, 44, .26);
+}
+.don-heart.sm { width: 34px; height: 34px; flex-basis: 34px; border-radius: 10px; box-shadow: 0 6px 14px rgba(196, 69, 44, .22); }
+.don-heart.lg { width: 52px; height: 52px; flex-basis: 52px; border-radius: 16px; }
+.don-heart .ic { fill: rgba(255, 255, 255, .22); animation: don-beat 3.2s ease-in-out infinite; }
+.don-btn {
+  background: linear-gradient(135deg, #E27A40, #B9442B); color: #fff; border: 0; font-weight: 600; white-space: nowrap;
+  box-shadow: 0 6px 14px rgba(185, 68, 43, .24); transition: transform .15s, box-shadow .15s, filter .15s;
+}
+.don-btn:hover { color: #fff; filter: brightness(1.06); transform: translateY(-1px); box-shadow: 0 10px 20px rgba(185, 68, 43, .3); }
+.don-btn .ic { fill: rgba(255, 255, 255, .25); }
+.don-kicker { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--c-ember); font-weight: 600; }
+
+/* Carte de la page de connexion */
+.don-card {
+  display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 13px; border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--c-ember) 20%, transparent);
+  background: linear-gradient(120deg, var(--c-ember-soft), var(--c-surface) 78%);
+}
+.don-card-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 12.5px; line-height: 1.4; color: var(--c-text-2); }
+.don-card-txt strong { color: var(--c-text); font-size: 13px; font-weight: 600; }
+.don-card .don-btn { padding: 8px 13px; font-size: 12.5px; }
+
+/* Bandeau du tableau de bord */
+.don-banner {
+  position: relative; overflow: hidden; display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-radius: var(--r-xl);
+  border: 1px solid color-mix(in srgb, var(--c-ember) 18%, transparent);
+  background: radial-gradient(120% 140% at 0% 0%, var(--c-ember-soft) 0%, var(--c-surface) 62%);
+  box-shadow: var(--shadow-1);
+}
+.don-banner::after {
+  content: ""; position: absolute; right: -40px; top: -60px; width: 220px; height: 220px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, #F29056 18%, transparent), transparent 70%);
+}
+.don-banner-txt { flex: 1; min-width: 0; }
+.don-banner-txt strong { display: block; font-size: 15px; margin: 2px 0 3px; color: var(--c-text); }
+.don-banner-txt p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--c-text-2); max-width: 760px; }
+.don-banner-act { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; position: relative; z-index: 1; }
+
+/* Lien de la barre latérale */
+.rail-don {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px; border-radius: var(--r-md); cursor: pointer;
+  font: inherit; font-size: 12.5px; color: #FFD9C2; text-align: left;
+  background: linear-gradient(120deg, rgba(242, 144, 86, .16), rgba(196, 69, 44, .08)); border: 1px solid rgba(242, 144, 86, .28);
+  transition: background .15s, color .15s;
+}
+.rail-don:hover { color: #fff; background: linear-gradient(120deg, rgba(242, 144, 86, .28), rgba(196, 69, 44, .16)); }
+.rail-don .ic { color: #F29056; fill: rgba(242, 144, 86, .25); flex: 0 0 auto; }
+
+/* Fenêtre de don */
+.don-dlg { display: flex; flex-direction: column; gap: 14px; }
+.don-dlg-head { display: flex; align-items: center; gap: 14px; }
+.don-dlg-title { font-family: var(--f-serif); font-size: 19px; line-height: 1.25; font-weight: 600; letter-spacing: -.01em; color: var(--c-text); margin-top: 2px; }
+.don-dlg-msg { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--c-text-2); }
+.don-lbl { font-size: 11.5px; font-weight: 600; color: var(--c-text-2); margin-bottom: -6px; }
+.don-amounts { display: grid; gap: 8px; }
+.don-amt {
+  font: inherit; font-family: var(--f-mono); font-size: 14px; font-weight: 600; padding: 11px 8px; border-radius: 11px; cursor: pointer;
+  background: var(--c-surface); color: var(--c-text); border: 1.5px solid var(--c-line); transition: border-color .15s, background .15s, transform .1s;
+}
+.don-amt[data-amt="0"] { grid-column: 1 / -1; font-family: var(--f-sans); font-size: 12.5px; font-weight: 500; padding: 9px 8px; border-style: dashed; color: var(--c-text-2); }
+.don-amt[data-amt="0"].on { border-style: solid; color: var(--c-ember); }
+.don-amt:hover { border-color: color-mix(in srgb, var(--c-ember) 45%, var(--c-line)); }
+.don-amt:active { transform: scale(.97); }
+.don-amt.on { border-color: var(--c-ember); background: var(--c-ember-soft); color: var(--c-ember); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-ember) 14%, transparent); }
+.don-cta { justify-content: center; padding: 12px; border-radius: 12px; font-size: 14.5px; text-decoration: none; }
+.don-fine { display: flex; gap: 7px; align-items: flex-start; font-size: 11.5px; line-height: 1.5; color: var(--c-text-3); }
+.don-fine .ic { flex: 0 0 auto; margin-top: 2px; }
+.don-thanks { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 10px 6px 4px; }
+
+@keyframes don-beat { 0%, 70%, 100% { transform: scale(1); } 78% { transform: scale(1.14); } 86% { transform: scale(.98); } 92% { transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .don-heart .ic { animation: none; } }
+@media (max-width: 720px) {
+  .don-banner { flex-wrap: wrap; align-items: flex-start; padding: 14px; gap: 12px; }
+  .don-banner-txt { flex-basis: calc(100% - 60px); }
+  .don-banner-txt p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .don-banner-act { width: 100%; }
+  .don-banner-act .don-btn { flex: 1; justify-content: center; }
+}
+@media (max-width: 420px) {
+  .don-card { flex-wrap: wrap; }
+  .don-card-txt { flex-basis: calc(100% - 50px); }
+  .don-card .don-btn { width: 100%; justify-content: center; }
+}
+
 @media print {
   .rail, .topbar-actions, .btn, .toasts { display: none !important; }
   body { background: #fff; }
@@ -1097,7 +1185,7 @@ const Schema = (() => {
       id: uid("usr"),
       name: p.name || "",
       email: p.email || "",
-      role: p.role || "ingenieur", // admin | ingenieur | consultation
+      role: p.role || "ingenieur", // admin | responsable | ingenieur | consultation
       active: p.active === undefined ? true : !!p.active,
       createdAt: nowIso(),
     };
@@ -2587,6 +2675,11 @@ const Auth = (() => {
       desc: "Catalogue, référentiels, utilisateurs et projets",
       can: { catalogWrite: true, projectWrite: true, settingsWrite: true, usersWrite: true, export: true },
     },
+    responsable: {
+      label: "Responsable BET",
+      desc: "Administrateur délégué : catalogue, référentiels, projets et comptes (sans suppression de comptes)",
+      can: { catalogWrite: true, projectWrite: true, settingsWrite: true, usersWrite: true, export: true },
+    },
     ingenieur: {
       label: "Ingénieur / Chargé d'études",
       desc: "Crée et modifie les projets, consulte le catalogue",
@@ -2705,6 +2798,7 @@ const UI = (() => {
     external: "M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
     gauge: "M3.5 17a9 9 0 1 1 17 0M12 17l4.5-6M8 20h8",
     wand: "M4 20 15 9m2-5v3m-1.5-1.5h3M20 10v2m-1-1h2M9 3v2M8 4h2",
+    heart: "M12 20.5s-8-4.9-8-10.6A4.4 4.4 0 0 1 12 7.4a4.4 4.4 0 0 1 8 2.5c0 5.7-8 10.6-8 10.6Z",
   };
 
   function icon(name, size = 16, cls = "") {
@@ -3220,6 +3314,222 @@ const Hero = (() => {
 })();
 
 /* ------------------------------------------------------------------------
+ * Dons PayPal : « l'application vous aide au quotidien ? ».
+ * Réglages publics (table site_settings, clé « donation ») modifiables par
+ * l'administrateur dans Paramètres → Dons PayPal, sans republier le fichier.
+ * Valeurs par défaut intégrées si rien n'est enregistré.
+ * ---------------------------------------------------------------------- */
+const Don = (() => {
+  "use strict";
+  const CACHE = "bet_don_v1", HIDE = "bet_don_hide_until";
+  const HIDE_DAYS = 45;
+  const DEFAULTS = {
+    enabled: true,
+    email: "oufaaiz.saad@gmail.com",
+    paypalme: "https://paypal.me/oufaaizsaad",
+    currency: "EUR",
+    amounts: [5, 10, 20, 50],
+    message: "Si l'application vous aide dans votre quotidien, vous pouvez soutenir son développement par un don. "
+      + "Chaque contribution finance l'hébergement, la maintenance et les prochaines fonctionnalités.",
+  };
+  const esc = s => Core.esc(s);
+  const icon = (n, s, c) => UI.icon(n, s, c);
+  let conf = null;
+
+  function normalize(v) {
+    const o = Object.assign({}, DEFAULTS, v && typeof v === "object" ? v : {});
+    o.enabled = o.enabled !== false;
+    o.email = String(o.email || "").trim() || DEFAULTS.email;
+    o.paypalme = String(o.paypalme || "").trim();
+    o.currency = /^[A-Z]{3}$/.test(o.currency) ? o.currency : "EUR";
+    let a = Array.isArray(o.amounts) ? o.amounts : String(o.amounts || "").split(/[;,\s]+/);
+    a = [...new Set(a.map(x => Math.round(Number(String(x).replace(",", ".")) * 100) / 100))]
+      .filter(n => n > 0 && n <= 10000).sort((x, y) => x - y).slice(0, 6);
+    o.amounts = a.length ? a : DEFAULTS.amounts.slice();
+    o.message = String(o.message || "").trim().slice(0, 600) || DEFAULTS.message;
+    return o;
+  }
+
+  function get() {
+    if (!conf) {
+      let v = null;
+      try { v = JSON.parse(localStorage.getItem(CACHE) || "null"); } catch (e) { /* ignore */ }
+      conf = normalize(v);
+    }
+    return conf;
+  }
+  function remember(v) {
+    conf = normalize(v);
+    try { localStorage.setItem(CACHE, JSON.stringify(conf)); } catch (e) { /* ignore */ }
+    return conf;
+  }
+
+  /** Lit le réglage public (lisible avant connexion). */
+  async function fetchSetting() {
+    try {
+      const { data, error } = await Cloud.client().from("site_settings").select("value").eq("key", "donation").maybeSingle();
+      if (error) throw error;
+      return remember(data && data.value && Object.keys(data.value).length ? data.value : null);
+    } catch (e) { return get(); }
+  }
+
+  async function save(v) {
+    const n = normalize(v);
+    const { error } = await Cloud.client().from("site_settings")
+      .upsert({ key: "donation", value: n, updated_at: new Date().toISOString(), updated_by: (Cloud.profile() || {}).id });
+    if (error) throw new Error(Cloud.frMsg(error));
+    return remember(n);
+  }
+
+  /* ------------------------------------------------------------ Liens */
+  /** « paypal.me/nom », « https://www.paypal.me/nom » ou « nom » → URL PayPal.me, sinon "". */
+  function paypalMe(s) {
+    const m = String(s || "").trim().replace(/^https?:\/\//i, "").replace(/^www\./i, "")
+      .replace(/^paypal\.me\//i, "").replace(/[/?#].*$/, "");
+    return m && /^[A-Za-z0-9._-]{1,40}$/.test(m) ? "https://www.paypal.me/" + m : "";
+  }
+  const fmt = n => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+
+  /** Lien de don : montant facultatif (sinon le donateur choisit sur PayPal). */
+  function url(amount, c) {
+    c = c || get();
+    const amt = Number(amount) > 0 ? Math.round(Number(amount) * 100) / 100 : 0;
+    const me = paypalMe(c.paypalme);
+    if (me) return me + (amt ? "/" + fmt(amt) + c.currency : "");
+    const p = new URLSearchParams({ business: c.email, no_recurring: "0", currency_code: c.currency, item_name: "Soutien à BET Chiffrage" });
+    if (amt) p.set("amount", fmt(amt));
+    return "https://www.paypal.com/donate/?" + p.toString();
+  }
+  const money = (n, c) => fmt(n).replace(".", ",") + (c.currency === "EUR" ? " €" : " " + c.currency);
+
+  /* ------------------------------------------------------------ Affichages */
+  const heart = (s = 18) => icon("heart", s);
+
+  /** Carte compacte (page de connexion). */
+  function gateCard(force) {
+    const c = get();
+    if (!c.enabled && !force) return "";
+    return `<div class="don-card">
+      <span class="don-heart sm">${heart(17)}</span>
+      <div class="don-card-txt"><strong>L'application vous aide au quotidien ?</strong>
+        <span>Soutenez son développement par un don PayPal.</span></div>
+      <button class="btn don-btn" type="button" data-act="donOpen">Faire un don</button>
+    </div>`;
+  }
+
+  function hiddenUntil() { try { return Number(localStorage.getItem(HIDE) || 0); } catch (e) { return 0; } }
+
+  /** Bandeau du tableau de bord (masquable quelques semaines). */
+  function banner(preview) {
+    const c = get();
+    if (!preview && (!c.enabled || hiddenUntil() > Date.now())) return "";
+    return `<div class="don-banner">
+      <span class="don-heart">${heart(20)}</span>
+      <div class="don-banner-txt">
+        <div class="don-kicker">Projet indépendant</div>
+        <strong>Cette application vous aide dans votre quotidien ?</strong>
+        <p>${esc(c.message)}</p>
+      </div>
+      <div class="don-banner-act">
+        <button class="btn don-btn" data-act="donOpen">${heart(15)} Faire un don</button>
+        ${preview ? "" : `<button class="btn btn-ghost btn-sm" data-act="donHide" title="Masquer ce message pendant ${HIDE_DAYS} jours">Plus tard</button>`}
+      </div>
+    </div>`;
+  }
+
+  /** Lien discret dans la barre latérale. */
+  function railLink() {
+    return get().enabled ? `<button class="rail-don" data-act="donOpen" title="Faire un don PayPal">${heart(15)}<span>Soutenir le projet</span></button>` : "";
+  }
+
+  /** Fenêtre de don : choix du montant puis ouverture de PayPal. */
+  function dialog() {
+    const c = get();
+    let amt = c.amounts[Math.min(1, c.amounts.length - 1)];
+    const m = UI.modal({
+      title: "Soutenir BET Chiffrage", size: "narrow", footer: null,
+      body: `<div class="don-dlg">
+        <div class="don-dlg-head">
+          <span class="don-heart lg">${heart(24)}</span>
+          <div><div class="don-kicker">Projet indépendant</div>
+            <div class="don-dlg-title">Cette application vous aide dans votre quotidien ?</div></div>
+        </div>
+        <p class="don-dlg-msg">${esc(c.message)}</p>
+        <div class="don-lbl">Choisissez un montant</div>
+        <div class="don-amounts" role="radiogroup" aria-label="Montant du don" style="grid-template-columns:repeat(${c.amounts.length <= 4 ? c.amounts.length : 3}, minmax(0, 1fr))">
+          ${c.amounts.map(a => `<button type="button" class="don-amt" role="radio" data-amt="${a}">${esc(money(a, c))}</button>`).join("")}
+          <button type="button" class="don-amt" role="radio" data-amt="0">Autre montant, à choisir sur PayPal</button>
+        </div>
+        <a class="btn don-btn don-cta" id="don-go" href="#" target="_blank" rel="noopener noreferrer"></a>
+        <div class="don-fine">${icon("lock", 13)} <span>Paiement sécurisé sur le site de PayPal, dans un nouvel onglet.
+          Le don est libre et facultatif : l'application reste accessible à tous.</span></div>
+      </div>`,
+    });
+    const go = m.el.querySelector("#don-go");
+    const paint = () => {
+      m.el.querySelectorAll(".don-amt").forEach(b => {
+        const on = Number(b.dataset.amt) === amt;
+        b.classList.toggle("on", on); b.setAttribute("aria-checked", on ? "true" : "false");
+      });
+      go.href = url(amt, c);
+      go.innerHTML = `${heart(16)} ${amt ? "Donner " + esc(money(amt, c)) + " avec PayPal" : "Faire un don avec PayPal"}`;
+    };
+    m.el.querySelector(".don-amounts").addEventListener("click", e => {
+      const b = e.target.closest(".don-amt"); if (!b) return;
+      amt = Number(b.dataset.amt) || 0; paint();
+    });
+    go.addEventListener("click", () => {
+      setTimeout(() => {
+        const body = m.el.querySelector(".modal-body");
+        if (!body) return;
+        body.innerHTML = `<div class="don-thanks">
+          <span class="don-heart lg">${heart(26)}</span>
+          <div class="don-dlg-title">Merci pour votre soutien !</div>
+          <p class="don-dlg-msg">La page PayPal s'est ouverte dans un nouvel onglet. Si elle ne s'affiche pas,
+            <a href="${esc(go.href)}" target="_blank" rel="noopener noreferrer">cliquez ici</a>.</p>
+          <button class="btn" data-modal-close>Fermer</button>
+        </div>`;
+      }, 250);
+    });
+    paint();
+    return m;
+  }
+
+  function hide() {
+    try { localStorage.setItem(HIDE, String(Date.now() + HIDE_DAYS * 864e5)); } catch (e) { /* ignore */ }
+  }
+
+  UI.register({
+    donOpen: () => dialog(),
+    donHide: () => {
+      hide();
+      UI.toast("Message masqué. Le lien « Soutenir le projet » reste disponible dans la barre latérale.", "ok", 4000);
+      App.render();
+    },
+    donSave: async () => {
+      const v = n => { const el = document.querySelector('[name="' + n + '"]'); return el ? el : null; };
+      const email = (v("donEmail") || {}).value || "";
+      const me = (v("donMe") || {}).value || "";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return UI.toast("Adresse e-mail PayPal invalide.", "warn");
+      if (me.trim() && !paypalMe(me)) return UI.toast("Lien PayPal.me non reconnu (ex. paypal.me/votrenom).", "warn");
+      try {
+        await save({
+          enabled: !!(v("donEnabled") && v("donEnabled").checked),
+          email, paypalme: me,
+          message: (v("donMsg") || {}).value || "",
+          amounts: (v("donAmounts") || {}).value || "",
+          currency: "EUR",
+        });
+        UI.toast("Réglages des dons enregistrés : ils s'appliquent immédiatement pour tous.", "ok", 4000);
+        App.render();
+      } catch (e) { UI.toast(e.message, "err", 6000); }
+    },
+  }, UI.Actions);
+
+  return { get, fetchSetting, save, url, paypalMe, gateCard, banner, railLink, dialog, DEFAULTS };
+})();
+
+/* ------------------------------------------------------------------------
  * Écrans d'accès : connexion, puis mot de passe personnel obligatoire.
  * ---------------------------------------------------------------------- */
 const Gate = (() => {
@@ -3352,6 +3662,7 @@ const Gate = (() => {
               <span>${UI.icon("user", 13)} Accès sur invitation</span>
               <span>${UI.icon("info", 13)} <a href="#" data-gtab="support">Besoin d'aide ?</a></span>
             </div>
+            <div id="g-don">${Don.gateCard()}</div>
             <div class="gate-legal xsmall muted-3">© ${new Date().getFullYear()} BET Chiffrage · Établi par Saad Oufaaiz</div>
           </div>
         </section>
@@ -3365,6 +3676,7 @@ const Gate = (() => {
         vis.classList.toggle("has-photo", !!v);
         media.innerHTML = v ? `<img src="${esc(v.url)}" alt="" style="object-position:${esc(v.position || "center")}">` : Hero.illustration();
       });
+      Don.fetchSetting().then(() => { const d = document.getElementById("g-don"); if (d) d.innerHTML = Don.gateCard(); });
       const pane = document.getElementById("g-pane");
       const panes = {
         login: () => `
@@ -3647,10 +3959,11 @@ const App = (() => {
         ${link("reports")}
         <div class="rail-group">Configuration</div>
         ${link("settings")}
-        ${Auth.role() === "admin" ? link("users") : ""}
+        ${Auth.can("usersWrite") ? link("users") : ""}
         ${link("support", Auth.role() === "admin" && Views.Support.newCount() ? Views.Support.newCount() : undefined)}
       </div>
       <div class="rail-foot">
+        ${Don.railLink()}
         <div class="rail-status" id="save-status"><span class="dot"></span><span>Enregistré</span></div>
         <button class="rail-user" data-act="switchUser" title="Mon compte : mot de passe, déconnexion">
           <span class="rail-avatar">${esc(initials)}</span>
@@ -3826,6 +4139,7 @@ const App = (() => {
     render();
     if (Auth.role() === "admin") Views.Support.load();
     Hero.fetchSetting();
+    { const before = JSON.stringify(Don.get()); Don.fetchSetting().then(c => { if (JSON.stringify(c) !== before) render(); }); }
     // Photo d'accueil (Paramètres → Page d'accueil)
     const heroVals = () => { const pos = document.querySelector('[name="heroPos"]'); const cr = document.querySelector('[name="heroCredit"]');
       return { position: pos ? pos.value : "center", credit: cr ? cr.value.trim() : "" }; };
@@ -4205,8 +4519,8 @@ Views.Catalog = (() => {
   /* -------------------------------------------------------------- Actions */
   UI.register({
     catFilterCat: d => { ui.categoryId = d.id; App.render(); },
-    catNew: () => { if (!Auth.require("catalogWrite", "Seul un administrateur peut modifier le catalogue.")) return; editDialog(null); },
-    catEdit: d => { if (!Auth.require("catalogWrite", "Seul un administrateur peut modifier le catalogue.")) return; editDialog(Repo.items.get(d.id)); },
+    catNew: () => { if (!Auth.require("catalogWrite", "Votre rôle ne permet pas de modifier le catalogue.")) return; editDialog(null); },
+    catEdit: d => { if (!Auth.require("catalogWrite", "Votre rôle ne permet pas de modifier le catalogue.")) return; editDialog(Repo.items.get(d.id)); },
     catHistory: d => historyDialog(Repo.items.get(d.id)),
     catDup: async d => {
       if (!Auth.require("catalogWrite")) return;
@@ -6936,7 +7250,7 @@ Views.Dpe = (() => {
 
 /* ===== 13c-view-users.js ============================================= */
 /* =========================================================================
- * 13c — COMPTES UTILISATEURS (administrateurs) + « Mon compte ».
+ * 13c — COMPTES UTILISATEURS (administrateur, Responsable BET) + « Mon compte ».
  * ========================================================================= */
 Views.Users = (() => {
   "use strict";
@@ -6944,6 +7258,14 @@ Views.Users = (() => {
   const icon = UI.icon;
   const ROLE_LABEL = r => (Auth.ROLES[r] || {}).label || r;
   const state = { users: null, me: null, loading: false, error: "", q: "" };
+  // Administrateur : tout. Responsable BET : comptes Ingénieur / Consultation, sans suppression.
+  const STAFF = ["ingenieur", "consultation"];
+  const isAdmin = () => Auth.role() === "admin";
+  const canManage = () => Auth.can("usersWrite");
+  const canTouch = u => isAdmin() || STAFF.includes(u.role);
+  const roleOptions = () => Object.entries(Auth.ROLES)
+    .filter(([k]) => isAdmin() || STAFF.includes(k))
+    .map(([k, r]) => [k, r.label + " — " + r.desc]);
 
   async function load() {
     state.loading = true; state.error = "";
@@ -6954,7 +7276,7 @@ Views.Users = (() => {
   }
 
   function actions() {
-    return Auth.role() === "admin"
+    return canManage()
       ? `<button class="btn" data-act="usrReload">${icon("refresh", 15)} Actualiser</button>
          <button class="btn btn-primary" data-act="usrNew">${icon("plus", 15)} Inscrire une personne</button>` : "";
   }
@@ -6966,7 +7288,7 @@ Views.Users = (() => {
   }
 
   function render() {
-    if (Auth.role() !== "admin") return Frag.empty("Accès réservé", "Seuls les administrateurs gèrent les comptes.");
+    if (!canManage()) return Frag.empty("Accès réservé", "Seuls l'administrateur et le Responsable BET gèrent les comptes.");
     if (!state.users && !state.loading && !state.error) { load(); }
     if (state.error) return `<div class="notice danger">${icon("alert", 15)}<div>${esc(state.error)}
       <div style="margin-top:8px"><button class="btn btn-sm" data-act="usrReload">${icon("refresh", 14)} Réessayer</button></div></div></div>`;
@@ -6991,21 +7313,29 @@ Views.Users = (() => {
             <td>${statusTag(u)}</td>
             <td class="small">${u.must_change_password ? `<span class="tag warn">provisoire</span>` : `<span class="muted">personnel</span>${u.password_changed_at ? `<div class="xsmall muted-3">changé le ${esc(Core.dateFR(u.password_changed_at))}</div>` : ""}`}</td>
             <td class="small muted">${u.last_sign_in_at ? esc(dateTimeFR(u.last_sign_in_at)) : "jamais"}</td>
-            <td class="r nowrap">
-              ${u.status === "pending" ? `<button class="btn btn-sm btn-primary" data-act="usrEdit" data-id="${esc(u.id)}">Activer</button>` : ""}
-              <button class="btn btn-ghost btn-icon" data-act="usrEdit" data-id="${esc(u.id)}" title="Modifier le rôle ou le statut">${icon("edit", 14)}</button>
-              <button class="btn btn-ghost btn-icon" data-act="usrReset" data-id="${esc(u.id)}" title="Réinitialiser le mot de passe">${icon("lock", 14)}</button>
-              ${u.id === state.me ? "" : `<button class="btn btn-ghost btn-icon" data-act="usrDel" data-id="${esc(u.id)}" title="Supprimer le compte">${icon("trash", 14)}</button>`}
-            </td></tr>`).join("") : `<tr><td colspan="6">${Frag.empty("Aucun compte", "Modifiez la recherche.")}</td></tr>`}
+            <td class="r nowrap">${rowActions(u)}</td></tr>`).join("") : `<tr><td colspan="6">${Frag.empty("Aucun compte", "Modifiez la recherche.")}</td></tr>`}
           </tbody>
         </table></div>
       </div>
+      ${isAdmin() ? "" : `<div class="notice">${icon("lock", 15)}<div><strong>Responsable BET :</strong> vous inscrivez des Ingénieurs et des
+        comptes Consultation, réinitialisez leurs mots de passe et pouvez les désactiver. Les comptes Administrateur et Responsable BET
+        sont gérés par l'administrateur, qui est seul à pouvoir supprimer un compte.</div></div>`}
       <div class="notice">${icon("info", 15)}<div>
         <strong>Fonctionnement :</strong> vous inscrivez une personne avec son e-mail et un mot de passe provisoire, que vous lui
         transmettez. À sa première connexion, l'application l'oblige à choisir son propre mot de passe ; elle pourra ensuite le
         changer à tout moment depuis « Mon compte » (bas de la barre latérale). Si elle l'oublie, réinitialisez-le ici
         (${icon("lock", 13)}) : un nouveau mot de passe provisoire lui sera demandé de changer.</div></div>
     </div>`;
+  }
+
+  function rowActions(u) {
+    const self = u.id === state.me;
+    if (!canTouch(u) && !self) return `<span class="xsmall muted-3">géré par l'administrateur</span>`;
+    const editable = isAdmin() || !self;
+    return `${u.status === "pending" && editable ? `<button class="btn btn-sm btn-primary" data-act="usrEdit" data-id="${esc(u.id)}">Activer</button>` : ""}
+      ${editable ? `<button class="btn btn-ghost btn-icon" data-act="usrEdit" data-id="${esc(u.id)}" title="Modifier le rôle ou le statut">${icon("edit", 14)}</button>` : ""}
+      <button class="btn btn-ghost btn-icon" data-act="usrReset" data-id="${esc(u.id)}" title="${self ? "Changer mon mot de passe" : "Réinitialiser le mot de passe"}">${icon("lock", 14)}</button>
+      ${isAdmin() && !self ? `<button class="btn btn-ghost btn-icon" data-act="usrDel" data-id="${esc(u.id)}" title="Supprimer le compte">${icon("trash", 14)}</button>` : ""}`;
   }
 
   /* --------------------------------------------------------- Dialogues */
@@ -7046,7 +7376,7 @@ Views.Users = (() => {
           ${UI.field("Adresse e-mail *", `<input class="inp" name="email" type="email" autocomplete="off" placeholder="prenom.nom@exemple.fr" value="${esc(pre.email || "")}">`)}
           ${UI.field("Nom complet", UI.textInput("full_name", pre.full_name || "", 'placeholder="Prénom Nom"'))}
         </div>
-        ${UI.field("Rôle", UI.selectInput("role", Object.entries(Auth.ROLES).map(([k, r]) => [k, r.label + " — " + r.desc]), "ingenieur"))}
+        ${UI.field("Rôle", UI.selectInput("role", roleOptions(), "ingenieur"))}
         ${pwdField(Cloud.tempPassword())}`,
       footer: `<button class="btn" data-modal-close>Annuler</button>
                <button class="btn btn-primary" data-save>${icon("check", 15)} Créer le compte</button>`,
@@ -7074,7 +7404,7 @@ Views.Users = (() => {
     const m = UI.modal({
       title: "Modifier le compte", sub: u.email,
       body: `${UI.field("Nom complet", UI.textInput("full_name", u.full_name || ""))}
-        ${UI.field("Rôle", UI.selectInput("role", Object.entries(Auth.ROLES).map(([k, r]) => [k, r.label + " — " + r.desc]), u.role, self ? "disabled" : ""))}
+        ${UI.field("Rôle", UI.selectInput("role", self ? [[u.role, ROLE_LABEL(u.role)]] : roleOptions(), u.role, self ? "disabled" : ""))}
         <label class="row small" style="gap:7px"><input type="checkbox" name="active"${u.status === "active" || u.status === "pending" ? " checked" : ""}${self ? " disabled" : ""}>
           Compte actif (peut se connecter)</label>
         ${self ? `<p class="hint">Vous ne pouvez pas retirer vos propres droits d'administrateur.</p>` : ""}`,
@@ -7153,8 +7483,9 @@ Views.Users = (() => {
         </div>
         <div class="stack-sm">
           <button class="btn" style="justify-content:flex-start" data-acc="pwd">${icon("lock", 15)} Changer mon mot de passe</button>
-          ${admin ? `<button class="btn" style="justify-content:flex-start" data-acc="users">${icon("user", 15)} Gérer les comptes</button>` : ""}
+          ${canManage() ? `<button class="btn" style="justify-content:flex-start" data-acc="users">${icon("user", 15)} Gérer les comptes</button>` : ""}
           <button class="btn" style="justify-content:flex-start" data-acc="support">${icon("info", 15)} ${admin ? "Demandes de support" : "Contacter le support"}</button>
+          ${Don.get().enabled ? `<button class="btn" style="justify-content:flex-start" data-acc="don">${icon("heart", 15)} Soutenir le projet (don PayPal)</button>` : ""}
           <button class="btn btn-danger" style="justify-content:flex-start" data-acc="out">${icon("external", 15)} Se déconnecter</button>
         </div>`,
       footer: null,
@@ -7163,6 +7494,8 @@ Views.Users = (() => {
     const u = m.el.querySelector('[data-acc="users"]');
     if (u) u.addEventListener("click", () => { m.close(); App.go("users"); });
     m.el.querySelector('[data-acc="support"]').addEventListener("click", () => { m.close(); App.go("support"); });
+    const dn = m.el.querySelector('[data-acc="don"]');
+    if (dn) dn.addEventListener("click", () => { m.close(); Don.dialog(); });
     m.el.querySelector('[data-acc="out"]').addEventListener("click", async () => {
       await Repo.flush(); await Cloud.signOut(); location.reload();
     });
@@ -7175,6 +7508,7 @@ Views.Users = (() => {
     usrEdit: d => { const u = find(d.id); if (u) editDialog(u); },
     usrReset: d => { const u = find(d.id); if (u) resetDialog(u); },
     usrDel: async d => {
+      if (!isAdmin()) return UI.toast("La suppression des comptes est réservée à l'administrateur.", "warn");
       const u = find(d.id); if (!u) return;
       const ok = await UI.confirm({ title: "Supprimer ce compte ?", message: (u.full_name || "") + " — " + u.email,
         detail: "La personne ne pourra plus se connecter. Pour une suspension temporaire, préférez la désactivation.",
@@ -7370,6 +7704,7 @@ Views.Dashboard = (() => {
 
     return `
     <div class="stack">
+      ${Don.banner()}
       <div class="stat-grid">
         ${Frag.stat("Projets actifs", String(projects.length), archived ? archived + " archivé(s)" : "Aucun archivé")}
         ${Frag.stat("Montant total chiffré", eur(grand), "Scénarios retenus, TTC", "accent")}
@@ -7704,6 +8039,7 @@ Views.Settings = (() => {
   const TABS = [
     ["bureau", "Bureau d'études"],
     ["accueil", "Page d'accueil"],
+    ["dons", "Dons PayPal"],
     ["tva", "TVA"],
     ["unites", "Unités"],
     ["categories", "Catégories"],
@@ -7721,8 +8057,46 @@ Views.Settings = (() => {
       <div class="tabs">${TABS.map(([k, l]) =>
         `<button class="tab ${cur === k ? "active" : ""}" data-act="setTab" data-tab="${k}">${esc(l)}</button>`).join("")}</div>
       ${Frag.roleNotice("settingsWrite")}
-      ${({ bureau, accueil, tva, unites, categories, coefficients, aides, frais, utilisateurs, donnees })[cur]()}
+      ${({ bureau, accueil, dons, tva, unites, categories, coefficients, aides, frais, utilisateurs, donnees })[cur]()}
     </div>`;
+  }
+
+  /* --------------------------------------------------------- Dons PayPal */
+  function dons() {
+    const c = Don.get();
+    const admin = Auth.role() === "admin";
+    const dis = admin ? "" : "disabled";
+    return `<div class="card">
+      <div class="card-head"><h3>Dons PayPal</h3>
+        <span class="spacer small muted-3">Invitation au don affichée sur la page de connexion, le tableau de bord et le menu</span></div>
+      <div class="card-body grid-2" style="align-items:start">
+        <div class="stack">
+          <label class="row" style="gap:9px;cursor:pointer;align-items:flex-start">
+            <input type="checkbox" name="donEnabled" ${c.enabled ? "checked" : ""} ${dis} style="margin-top:3px">
+            <span><span class="strong">Afficher l'invitation au don</span><br>
+              <span class="small muted">Décochez pour la retirer partout, sans republier le fichier.</span></span>
+          </label>
+          ${UI.field("Adresse e-mail PayPal qui reçoit les dons", UI.textInput("donEmail", c.email, 'type="email" autocomplete="off" ' + dis))}
+          ${UI.field("Lien PayPal.me (facultatif)", UI.textInput("donMe", c.paypalme, 'placeholder="ex. paypal.me/votrenom" autocomplete="off" ' + dis),
+            "S'il est renseigné, il est utilisé à la place du lien par e-mail.")}
+          ${UI.field("Message affiché", `<textarea class="inp" name="donMsg" rows="4" maxlength="600" ${dis}>${esc(c.message)}</textarea>`)}
+          ${UI.field("Montants proposés (€)", UI.textInput("donAmounts", c.amounts.join(", "), dis),
+            "Séparés par des virgules, 6 au maximum. Le donateur peut aussi choisir un montant libre.")}
+          ${admin ? `<div class="btn-group">
+              <button class="btn btn-primary" type="button" data-act="donSave">${icon("check", 15)} Enregistrer</button>
+              <a class="btn" href="${esc(Don.url(c.amounts[0]))}" target="_blank" rel="noopener noreferrer">${icon("external", 15)} Tester le lien PayPal</a>
+            </div>`
+            : `<div class="notice">${icon("lock", 15)}<div>Réservé aux administrateurs.</div></div>`}
+        </div>
+        <div class="stack">
+          <div class="xsmall muted-3" style="text-transform:uppercase;letter-spacing:.08em">Aperçu · tableau de bord</div>
+          ${Don.banner(true)}
+          <div class="xsmall muted-3" style="text-transform:uppercase;letter-spacing:.08em;margin-top:6px">Aperçu · page de connexion</div>
+          ${Don.gateCard(true)}
+          <div class="notice">${icon("info", 15)}<div class="small">Les dons arrivent directement sur le compte PayPal indiqué.
+            Faites un essai avec « Tester le lien PayPal » après chaque modification.</div></div>
+        </div>
+      </div></div>`;
   }
 
   /* ------------------------------------------------------ Page d'accueil */
@@ -7920,7 +8294,7 @@ Views.Settings = (() => {
     return `<div class="card"><div class="card-body stack-sm">
       <div class="notice">${icon("lock", 15)}<div>Les comptes, rôles et mots de passe sont désormais gérés en ligne
         (connexion par e-mail et mot de passe).</div></div>
-      ${Auth.role() === "admin" ? `<div><button class="btn btn-primary" data-act="go" data-route="users">${icon("user", 15)} Ouvrir la gestion des comptes</button></div>`
+      ${Auth.can("usersWrite") ? `<div><button class="btn btn-primary" data-act="go" data-route="users">${icon("user", 15)} Ouvrir la gestion des comptes</button></div>`
         : `<div><button class="btn" data-act="myPassword">${icon("lock", 15)} Changer mon mot de passe</button></div>`}
     </div></div>`;
   }
@@ -8009,7 +8383,7 @@ Views.Settings = (() => {
     return m;
   }
 
-  const guard = () => Auth.require("settingsWrite", "Seul un administrateur peut modifier les référentiels.");
+  const guard = () => Auth.require("settingsWrite", "Seuls l'administrateur et le Responsable BET peuvent modifier les référentiels.");
 
   UI.register({
     setTab: d => App.go("settings", { tab: d.tab }),
