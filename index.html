@@ -3,13 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Application de bureau d'etudes : extraction et synthese des DPE 3CL ADEME, chiffrage de travaux de renovation energetique, PPPT, DTG, audits.">
-<title>BET Chiffrage — DPE & Travaux</title>
+<meta name="description" content="Atelier BET : les outils du bureau d'etudes. Analyse des DPE 3CL ADEME, chiffrage de travaux de renovation energetique, PPPT, DTG, audits, suivi de projets.">
+<meta name="application-name" content="Atelier BET">
+<meta name="apple-mobile-web-app-title" content="Atelier BET">
+<meta name="theme-color" content="#12384A">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMkQ2RThBIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTIzODRBIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjZykiLz48cGF0aCBkPSJNMzIgNiBMNTkgMjcgSDUzIFY1OCBIMTEgVjI3IEg1IFoiIGZpbGw9IiNmZmYiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTE1IDMwaDEybDMuNSAzLjVsLTMuNSAzLjVoLTEyeiIgZmlsbD0iIzFGQTM1QyIvPjxwYXRoIGQ9Ik0xNSAzOWgxOWwzLjUgMy41bC0zLjUgMy41aC0xOXoiIGZpbGw9IiNGMkIyMDAiLz48cGF0aCBkPSJNMTUgNDhoMjZsMy41IDMuNWwtMy41IDMuNWgtMjZ6IiBmaWxsPSIjRTA0NDJGIi8+PC9zdmc+">
+<link rel="alternate icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEvUlEQVR4nKxXa0xbVRz/HXpboA+gA8p4jQUcow5WNjYHWSzDFyIJDx2iH4gQF7dF1OmnoUvsIosxMUMTI5psxjj9YLJMdB9m/GB8bNMPGpGhg2nGa4LFscAYIrDe47lt7+29t6eFZv01t+ee1/91/o9zBahQfsiTtrwkvEiASkrFcjbkoCJlDYXSUtbSQEtYXxQDrX9cvU7dEkxT0ddPQH4Ul0jPaN9bszJPIr/c3XmsDiJOEEpz1EwiMZf6yjvVviv79OsZHfabZN19Y6ffOacIsKXzWC314cuomqjGZc1tySb/+K3F/xCTpaRxH31krK/3HCk7+LpdhPgbG82OqoFO85L89Xit/VF//8jJ07g8PhnZUgHNdZbCpE9YLjNk7qw5wFbt1TCNook03ljlQnfHY7gr14EseyqqXSW4cfMWhie0QhCVxRCunI2I5G8mwH2HWK90rWd++Ik6PNf0ANalWBTntZmTcW/ZZqRazTg/MKTRHIjmI5gzZO6oeZN10rjMVZpkpaag9/k21Fe6YDIK0MMoGFC+qQCVziJcHLyC+YXFSJqHfIlQmyGzoqYnbFLl2VK/ylmI4wdaUVaYxzYRRII0l+dIh9vlxNVJL8a91yNHR6BNM2RU7PFEO/P2B3fj5SfrkZthx1qRnmKFu9zpp/nz8NWIviXRZxbY4+Ext7IQ6+5oxlNMAGtyEmKFOSkRlaXFKMxx4Pyvl7G8ssK1sMA7c+eG9Tja1ghXUT7uBCbmF83Vu7Ax24Gudz/G7yPjobwgWyBje7VHrXlD1VZ0tzdjU24W4oXsdDtqKkoxMzePoZEJxbek1pC+ze2RmR9ufRidDfdrQixeSLGY4d62BWk2C777ZVAJ0QSZ+f56N8qLNuDS6DWMSd4bZ4xOeTHwxwgqSorQ2VIPxRGLO16h+lx9qusZ7CopRDzxw6UhPN71RlieETRpUxP/QM/AGbw98FkYsVxLOj596AjyLBmIBbwak+CXKCxJBEDATzp/Lcyg9atu3Fz5F2vnDm5SEnhVL7SHRqS3t8iNFKMZsYCXEQXw0nAQlVlOYGs4Icn0LUyA2MCvtgKvCspWuEfwYnviQDit28DS8NdK15TfDmLeiFVF4CQ9gX8DCvK5/g2WrxxdlfDKxIew7P4WJLkgMvPgv74WBPKAXrLgpmiVT0N8cQwrU32rr9NHgShFAeVVQfWG1WEqfhWmwhdW484tyQLv5iMzTtzs8T/xgv6eIVlA0J+JqPKB2Y96MXfqfcQCgyMb2cdPwpCVEzanroKhWgDqDYsCecMafUAN3/QUpl56GnRhPmxOSXohpb2SD/QTTgj6N6zRB/Sw1jaAWGw67txrX79AKPpZp1ZzUwlaIcm1A7FCYKa31jZy56gYVnP6BTGBvEd8dD/rpMmOaDIagwLs9D/xQKKfpqbqzgoC4y1NFrQ820xEekaWLDdzHXvsQWOojoYi9IUTuNdroiegpramyO/XvNMYn5pW5qkoNs1cPPu54mUFTQfrmGgn2FdxDi9jKZKL/Jwe7RuSaEN9klBx3z8Xzvo/Tg2yAHNDP/1pLyn9gFJhmS1bYptsbLFFHbfgJC2OY4XWh4SWVL/A2k9uG0nbje+/GJT5/g8AAP//mHhFZAAAAAZJREFUAwAI/59lBk90bgAAAABJRU5ErkJggg==">
+<link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,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">
+<title>Atelier BET — Chiffrage, DPE & projets</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:wght@600&display=swap">
 <style>
 /* =========================================================================
- * BET Chiffrage — feuille de style applicative
+ * Atelier BET — feuille de style applicative
  * Identité : « bleu de plan » sur papier gris froid, typographie IBM Plex
  * (Sans pour l'interface, Mono pour toute donnée chiffrée, Serif réservé
  * aux pages de garde de rapport). Densité type logiciel métier.
@@ -160,8 +166,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
   display: grid; place-items: center; color: #DCEDF4;
   font-family: var(--f-mono); font-size: 13px; font-weight: 600; letter-spacing: -.04em;
 }
+.rail-mark .brand-svg { width: 20px; height: 20px; display: block; }
+.gate-logo .brand-svg { width: 22px; height: 22px; display: block; }
 .rail-title { font-size: 13.5px; font-weight: 600; color: #E8F0F5; line-height: 1.15; }
-.rail-sub { font-size: 10.5px; color: var(--c-rail-text-2); letter-spacing: .07em; text-transform: uppercase; margin-top: 2px; }
+.rail-sub { font-size: 11px; color: var(--c-rail-text-2); letter-spacing: .01em; margin-top: 2px; white-space: nowrap; }
 .rail-nav { padding: 6px 10px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
 .rail-group { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--c-rail-text-2); padding: 14px 8px 5px; }
 .rail-link {
@@ -2219,7 +2227,7 @@ const Repo = (() => {
 
   /* --------------------------------------------------- Sauvegarde / restauration */
   function exportJSON() {
-    return JSON.stringify({ exportedAt: Core.nowIso(), app: "BET Chiffrage", data: Object.assign(privPart(db), sharedPart(db)) }, null, 2);
+    return JSON.stringify({ exportedAt: Core.nowIso(), app: "Atelier BET", data: Object.assign(privPart(db), sharedPart(db)) }, null, 2);
   }
 
   /**
@@ -4484,7 +4492,7 @@ const Cloud = (() => {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          _subject: "[BET Chiffrage] " + KINDS[payload.kind] + " — " + (payload.full_name || payload.email),
+          _subject: "[Atelier BET] " + KINDS[payload.kind] + " — " + (payload.full_name || payload.email),
           _template: "table", _replyto: payload.email,
           "Objet": KINDS[payload.kind], "Nom": payload.full_name || "—", "E-mail": payload.email,
           "Société": payload.company || "—", "Message": payload.message || "—",
@@ -4499,7 +4507,7 @@ const Cloud = (() => {
   }
 
   function mailtoFor(req) {
-    const subject = "[BET Chiffrage] " + (KINDS[req.kind] || "Demande");
+    const subject = "[Atelier BET] " + (KINDS[req.kind] || "Demande");
     const body = `Nom : ${req.full_name || ""}\nE-mail : ${req.email || ""}\nSociété : ${req.company || ""}\n\n${req.message || ""}`;
     return "mailto:" + SUPPORT_EMAIL + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
   }
@@ -4752,7 +4760,7 @@ const Don = (() => {
     const amt = Number(amount) > 0 ? Math.round(Number(amount) * 100) / 100 : 0;
     const me = paypalMe(c.paypalme);
     if (me) return me + (amt ? "/" + fmt(amt) + c.currency : "");
-    const p = new URLSearchParams({ business: c.email, no_recurring: "0", currency_code: c.currency, item_name: "Soutien à BET Chiffrage" });
+    const p = new URLSearchParams({ business: c.email, no_recurring: "0", currency_code: c.currency, item_name: "Soutien à Atelier BET" });
     if (amt) p.set("amount", fmt(amt));
     return "https://www.paypal.com/donate/?" + p.toString();
   }
@@ -4803,7 +4811,7 @@ const Don = (() => {
     const c = get();
     let amt = c.amounts[Math.min(1, c.amounts.length - 1)];
     const m = UI.modal({
-      title: "Soutenir BET Chiffrage", size: "narrow", footer: null,
+      title: "Soutenir Atelier BET", size: "narrow", footer: null,
       body: `<div class="don-dlg">
         <div class="don-dlg-head">
           <span class="don-heart lg">${heart(24)}</span>
@@ -4894,8 +4902,8 @@ const Gate = (() => {
   const root = () => document.getElementById("app");
 
   const brand = `<div class="row" style="gap:10px;margin-bottom:18px">
-      <div class="rail-mark">BE</div>
-      <div><div class="strong">BET Chiffrage</div><div class="xsmall muted-3" style="letter-spacing:.07em;text-transform:uppercase">DPE · Rénovation énergétique</div></div>
+      <div class="rail-mark"><svg class="brand-svg" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M32 6 L59 27 H53 V58 H11 V27 H5 Z" fill="#fff" stroke="#fff" stroke-width="1" stroke-linejoin="round"/><path d="M15 30h12l3.5 3.5l-3.5 3.5h-12z" fill="#1FA35C"/><path d="M15 39h19l3.5 3.5l-3.5 3.5h-19z" fill="#F2B200"/><path d="M15 48h26l3.5 3.5l-3.5 3.5h-26z" fill="#E0442F"/></svg></div>
+      <div><div class="strong">Atelier BET</div><div class="xsmall muted-3">Chiffrage · DPE · Projets</div></div>
     </div>`;
 
   function frame(inner) {
@@ -4977,7 +4985,7 @@ const Gate = (() => {
           <div class="gate-media">${hero ? `<img src="${esc(hero.url)}" alt="" style="object-position:${esc(hero.position || "center")}">` : Hero.illustration()}</div>
           <div class="gate-shade"></div>
           <div class="gate-top">
-            <div class="gate-brand"><span class="gate-logo">BE</span><span>BET Chiffrage</span></div>
+            <div class="gate-brand"><span class="gate-logo"><svg class="brand-svg" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M32 6 L59 27 H53 V58 H11 V27 H5 Z" fill="#fff" stroke="#fff" stroke-width="1" stroke-linejoin="round"/><path d="M15 30h12l3.5 3.5l-3.5 3.5h-12z" fill="#1FA35C"/><path d="M15 39h19l3.5 3.5l-3.5 3.5h-19z" fill="#F2B200"/><path d="M15 48h26l3.5 3.5l-3.5 3.5h-26z" fill="#E0442F"/></svg></span><span>Atelier BET</span></div>
             <span class="gate-pill"><span class="gate-dot"></span> Diagnostic · Chiffrage · Aides</span>
           </div>
           <div class="gate-float gate-float-a" aria-hidden="true">
@@ -5027,7 +5035,7 @@ const Gate = (() => {
               <span>${UI.icon("info", 13)} <a href="#" data-gtab="support">Besoin d'aide ?</a></span>
             </div>
             <div id="g-don">${Don.gateCard()}</div>
-            <div class="gate-legal xsmall muted-3">© ${new Date().getFullYear()} BET Chiffrage · Établi par Saad Oufaaiz</div>
+            <div class="gate-legal xsmall muted-3">© ${new Date().getFullYear()} Atelier BET · Établi par Saad Oufaaiz</div>
           </div>
         </section>
       </div>`;
@@ -5316,10 +5324,10 @@ const App = (() => {
     return `
     <nav class="rail ${state.railOpen ? "open" : ""}" aria-label="Navigation principale">
       <div class="rail-brand">
-        <div class="rail-mark">BE</div>
+        <div class="rail-mark"><svg class="brand-svg" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M32 6 L59 27 H53 V58 H11 V27 H5 Z" fill="#fff" stroke="#fff" stroke-width="1" stroke-linejoin="round"/><path d="M15 30h12l3.5 3.5l-3.5 3.5h-12z" fill="#1FA35C"/><path d="M15 39h19l3.5 3.5l-3.5 3.5h-19z" fill="#F2B200"/><path d="M15 48h26l3.5 3.5l-3.5 3.5h-26z" fill="#E0442F"/></svg></div>
         <div>
-          <div class="rail-title">BET Chiffrage</div>
-          <div class="rail-sub">DPE · Rénovation énergétique</div>
+          <div class="rail-title">Atelier BET</div>
+          <div class="rail-sub">Chiffrage · DPE · Projets</div>
         </div>
       </div>
       <div class="rail-nav">
@@ -5400,7 +5408,7 @@ const App = (() => {
   function help() {
     UI.modal({
       title: "Aide & raccourcis",
-      sub: "BET Chiffrage — application de chiffrage pour bureau d'études",
+      sub: "Atelier BET — les outils du bureau d'études",
       body: `
       <div class="stack">
         <div>
@@ -8762,7 +8770,7 @@ Views.Users = (() => {
   }
 
   function credentialsDialog(title, email, password) {
-    const text = `Bonjour,\n\nVotre accès à BET Chiffrage est prêt.\nIdentifiant : ${email}\nMot de passe provisoire : ${password}\n\n`
+    const text = `Bonjour,\n\nVotre accès à Atelier BET est prêt.\nIdentifiant : ${email}\nMot de passe provisoire : ${password}\n\n`
       + `À votre première connexion, vous devrez choisir votre propre mot de passe.\n`;
     const m = UI.modal({
       title, sub: "À transmettre à la personne par un canal sûr",
@@ -8772,7 +8780,7 @@ Views.Users = (() => {
         </div>
         ${UI.field("Message prêt à envoyer", `<textarea class="inp" rows="7" readonly id="cred-txt">${esc(text)}</textarea>`)}
         <div class="notice warn">${icon("alert", 15)}<div>Ce mot de passe n'est plus affiché une fois cette fenêtre fermée.</div></div>`,
-      footer: `<a class="btn" href="mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent("Votre accès BET Chiffrage")}&body=${encodeURIComponent(text)}">${icon("external", 15)} Ouvrir dans ma messagerie</a>
+      footer: `<a class="btn" href="mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent("Votre accès Atelier BET")}&body=${encodeURIComponent(text)}">${icon("external", 15)} Ouvrir dans ma messagerie</a>
                <button class="btn btn-primary" data-copy>${icon("copy", 15)} Copier le message</button>`,
     });
     m.el.querySelector("[data-copy]").addEventListener("click", async () => {
@@ -13699,7 +13707,7 @@ const CRM = (() => {
   function ics(list, name) {
     const ev = list.map(icsEvent).filter(Boolean);
     if (!ev.length) return UI.toast("Aucune tâche datée à exporter.", "warn");
-    const body = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//BET Chiffrage//FR", "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR"].join("\r\n");
+    const body = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Atelier BET//FR", "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR"].join("\r\n");
     Ext.download(new Blob([body], { type: "text/calendar;charset=utf-8" }), name);
     UI.toast("Fichier agenda téléchargé : ouvrez-le pour ajouter " + (ev.length > 1 ? "les " + ev.length + " rappels" : "le rappel") + " à votre agenda.", "ok", 4500);
   }
@@ -13772,7 +13780,7 @@ const CRM = (() => {
     tkEdit: d => taskDialog(task(d.id)),
     tkDel: async d => { db().tasks = tasks().filter(t => t.id !== d.id); Repo.touch("tasks"); await Repo.flush(); App.render(); },
     tkIcs: d => { const t = task(d.id); if (t) ics([t], "rappel-" + Ext.slug(t.title) + ".ics"); },
-    tkIcsAll: () => ics(tasks().filter(t => !t.done), "taches-bet-chiffrage.ics"),
+    tkIcsAll: () => ics(tasks().filter(t => !t.done), "taches-atelier-bet.ics"),
   }, UI.Actions);
   UI.register({
     crmStatus: async (d, el) => {
@@ -13924,7 +13932,7 @@ const Livrables = (() => {
   async function saveDocx(D, sections, name, set) {
     const { Document, Packer, Footer, Paragraph, TextRun, AlignmentType, PageNumber } = D;
     const doc = new Document({
-      creator: set.bureauName || "BET Chiffrage", title: name,
+      creator: set.bureauName || "Atelier BET", title: name,
       styles: { default: { document: { run: { font: "Calibri", size: 21, color: "16212A" } } },
         paragraphStyles: [
           { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", run: { size: 30, bold: true, color: "1B5A73" }, paragraph: { spacing: { before: 360, after: 160 } } },
@@ -14630,7 +14638,7 @@ const AuthPlus = (() => {
       return UI.toast("Double authentification désactivée.", "ok");
     }
     for (const x of list) { try { await mfa().unenroll({ factorId: x.id }); } catch (e) { /* ancien essai */ } }
-    const { data, error } = await mfa().enroll({ factorType: "totp", friendlyName: "BET Chiffrage " + new Date().toISOString().slice(0, 10) });
+    const { data, error } = await mfa().enroll({ factorType: "totp", friendlyName: "Atelier BET " + new Date().toISOString().slice(0, 10) });
     if (error) return UI.toast(Cloud.frMsg(error), "err", 6000);
     const m = UI.modal({
       title: "Activer la double authentification", size: "",
@@ -14883,7 +14891,7 @@ const Guide = (() => {
       return `<div class="stack guide">
         <div class="card guide-hero"><div class="card-body">
           <div class="gate-eyebrow dark">Version ${VERSION}</div>
-          <h2 class="guide-title">Ce qui est nouveau dans BET Chiffrage</h2>
+          <h2 class="guide-title">Ce qui est nouveau dans Atelier BET</h2>
           <p class="muted">Tout ce qui a été ajouté, où le trouver et comment s'en servir. Les projets restent privés à chaque compte ; le catalogue est commun au bureau.</p>
           <div class="chip-row">${SECTIONS.map((s, i) => `<a class="chip" href="#guide" data-act="guideJump" data-i="${i}">${esc(s.t)}</a>`).join("")}</div>
         </div></div>
@@ -15078,7 +15086,7 @@ const ImportExport = (() => {
     const sub = `${s.bureauName || "Bureau d'études"} — généré le ${dateStr} — ${p.name} (${p.version})`;
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = s.bureauName || "BET Chiffrage";
+    wb.creator = s.bureauName || "Atelier BET";
     wb.created = new Date();
 
     /* Feuille 1 — Résumé */
@@ -15401,7 +15409,7 @@ const ImportExport = (() => {
     const s = Repo.settings.get();
     const dateStr = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "long", year: "numeric" }).format(new Date());
     const wb = new ExcelJS.Workbook();
-    wb.creator = s.bureauName || "BET Chiffrage";
+    wb.creator = s.bureauName || "Atelier BET";
     const ws = wb.addWorksheet("Catalogue", { views: [{ state: "frozen", ySplit: 4 }] });
     catalogSheet(ws, `${s.bureauName || "Bureau d'études"} — export du ${dateStr}`);
 
@@ -15722,7 +15730,7 @@ const ImportExport = (() => {
   /* ----------------------------------------------- Sauvegarde JSON (§23) */
   async function exportBackup() {
     const json = Repo.exportJSON();
-    const name = "sauvegarde-bet-chiffrage-" + Core.nowIso().slice(0, 10) + ".json";
+    const name = "sauvegarde-atelier-bet-" + Core.nowIso().slice(0, 10) + ".json";
     await api.deliver(name, json);
   }
 
@@ -16494,3 +16502,4 @@ const Reporting = (() => {
 </script>
 </body>
 </html>
+  
