@@ -713,6 +713,19 @@ table.tbl tr.picked td { background: var(--c-accent-soft); }
   .don-card .don-btn { width: 100%; justify-content: center; }
 }
 
+/* ------------------------------------------------------- Espaces privés */
+.privacy-box { display: flex; gap: 12px; align-items: flex-start; }
+.privacy-box > div > strong { display: block; margin-bottom: 3px; }
+.privacy-box p { margin: 0; line-height: 1.55; }
+.privacy-ic { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; display: grid; place-items: center; background: var(--c-accent-soft); color: var(--c-accent); }
+.legacy-list { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto; }
+.legacy-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--c-line); border-radius: 10px; cursor: pointer; background: var(--c-surface); }
+.legacy-row:hover { border-color: color-mix(in srgb, var(--c-accent) 45%, var(--c-line)); }
+.legacy-row:has(input:checked) { border-color: var(--c-accent); background: var(--c-accent-soft); }
+.legacy-row input { width: 16px; height: 16px; flex: 0 0 auto; }
+.legacy-txt { display: flex; flex-direction: column; min-width: 0; }
+.rail-status .dot.off { background: var(--c-warn); }
+
 @media print {
   .rail, .topbar-actions, .btn, .toasts { display: none !important; }
   body { background: #fff; }
@@ -1465,26 +1478,32 @@ const Seed = (() => {
 /* =========================================================================
  * 04 — REPOSITORY : accès aux données.
  *
- * Toute l'application passe par Repo.* et ne connaît JAMAIS le support de
- * stockage. L'API est asynchrone (Promises) exactement comme le serait un
- * client Supabase, pour que la bascule vers PostgreSQL soit un remplacement
- * de driver et non une réécriture :
+ * Chaque compte dispose d'un espace PRIVÉ en ligne (projets, DPE importés),
+ * que lui seul peut lire — administrateur compris. Le bureau partage un
+ * espace COMMUN (catalogue, référentiels, paramètres du bureau), lisible par
+ * tous et modifiable par l'administrateur et le Responsable BET.
  *
- *   LocalDriver  → IndexedDB (avec repli localStorage)   [actif]
- *   SupabaseDriver → @supabase/supabase-js               [prévu, cf. repo Next.js]
+ *   Supabase   user_workspaces          → 1 ligne par compte (RLS : propriétaire seul)
+ *              workspace_documents      → document « referentiels » du bureau
+ *   Navigateur IndexedDB, clé par compte → copie locale (hors ligne, reprise)
  *
- * Le driver ne connaît que deux opérations : load() / save(snapshot).
+ * En mémoire, l'application voit une seule base (db) ; la répartition
+ * privé / commun est faite à l'enregistrement. Si deux appareils modifient
+ * la même base, les changements sont fusionnés élément par élément.
  * ========================================================================= */
 const Repo = (() => {
   "use strict";
 
   const DB_NAME = "bet_chiffrage";
   const STORE = "kv";
-  const KEY = "snapshot_v1";
-  const LS_KEY = "bet_chiffrage_snapshot_v1";
+  const LEGACY_KEY = "snapshot_v1";                  // ancienne base commune du navigateur (avant la v1.3)
+  const LEGACY_LS = "bet_chiffrage_snapshot_v1";
+  const SHARED_DOC = "referentiels";
+  const SHARED_KEYS = ["categories", "items", "units", "vatRates", "coefficients", "aidRules", "feeTemplates", "settings"];
+  const PRIVATE_KEYS = ["meta", "projects", "dpeInbox"];
 
-  /* --------------------------------------------------- Driver : IndexedDB */
-  const IdbDriver = (() => {
+  /* ------------------------------------------ Stockage local : IndexedDB → localStorage → mémoire */
+  const Idb = (() => {
     let dbp = null;
     function open() {
       if (dbp) return dbp;
@@ -1492,82 +1511,191 @@ const Repo = (() => {
         if (typeof indexedDB === "undefined") return reject(new Error("IndexedDB indisponible"));
         const req = indexedDB.open(DB_NAME, 1);
         req.onupgradeneeded = () => {
-          const db = req.result;
-          if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+          const d = req.result;
+          if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE);
         };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error || new Error("Ouverture IndexedDB refusée"));
       });
       return dbp;
     }
+    const run = (mode, fn) => open().then(d => new Promise((resolve, reject) => {
+      const tx = d.transaction(STORE, mode);
+      const req = fn(tx.objectStore(STORE));
+      tx.oncomplete = () => resolve(req && "result" in req ? req.result : true);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error("Transaction annulée"));
+    }));
     return {
       name: "IndexedDB",
-      async load() {
-        const db = await open();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction(STORE, "readonly");
-          const req = tx.objectStore(STORE).get(KEY);
-          req.onsuccess = () => resolve(req.result || null);
-          req.onerror = () => reject(req.error);
-        });
-      },
-      async save(snapshot) {
-        const db = await open();
-        return new Promise((resolve, reject) => {
-          const tx = db.transaction(STORE, "readwrite");
-          tx.objectStore(STORE).put(snapshot, KEY);
-          tx.oncomplete = () => resolve(true);
-          tx.onerror = () => reject(tx.error);
-        });
-      },
+      get: key => run("readonly", s => s.get(key)).then(v => (v === undefined ? null : v)),
+      put: (key, value) => run("readwrite", s => s.put(value, key)).then(() => true),
+      del: key => run("readwrite", s => s.delete(key)).then(() => true),
     };
   })();
-
-  /* ------------------------------------------------- Driver : localStorage */
-  const LsDriver = {
+  const lsKey = k => (k === LEGACY_KEY ? LEGACY_LS : "bet_chiffrage_" + k);
+  const Ls = {
     name: "localStorage",
-    async load() {
-      try { const raw = localStorage.getItem(LS_KEY); return raw ? JSON.parse(raw) : null; }
-      catch (e) { console.warn("localStorage indisponible", e); return null; }
-    },
-    async save(snapshot) {
-      try { localStorage.setItem(LS_KEY, JSON.stringify(snapshot)); return true; }
-      catch (e) { console.warn("Écriture localStorage impossible", e); return false; }
-    },
+    async get(k) { const raw = localStorage.getItem(lsKey(k)); return raw ? JSON.parse(raw) : null; },
+    async put(k, v) { localStorage.setItem(lsKey(k), JSON.stringify(v)); return true; },
+    async del(k) { localStorage.removeItem(lsKey(k)); return true; },
   };
-
-  /** Driver mémoire — filet de sécurité si aucun stockage n'est autorisé. */
-  const MemDriver = (() => {
-    let mem = null;
-    return { name: "mémoire (non persistant)", async load() { return mem; }, async save(s) { mem = s; return true; } };
+  const Mem = (() => {
+    const m = new Map();
+    return { name: "mémoire", async get(k) { return m.has(k) ? m.get(k) : null; }, async put(k, v) { m.set(k, v); return true; }, async del(k) { m.delete(k); return true; } };
   })();
 
-  let driver = LsDriver;
-  let db = null;                 // snapshot en mémoire
-  let dirty = false;
-  let lastSavedAt = null;
-  let saving = false;
+  async function pickLocal() {
+    for (const d of [Idb, Ls]) {
+      try { await d.get("__probe__"); return d; } catch (e) { /* suivant */ }
+    }
+    return Mem;
+  }
+
+  /* ---------------------------------------------------------------- État */
+  let local = Mem;
+  let db = null;                 // base en mémoire (privé + commun)
+  let uid = null;                // compte connecté
+  let canShared = false;         // droit d'écrire l'espace commun
+  let online = false;            // dernier échange avec le serveur réussi
+  let legacy = null;             // ancienne base commune du navigateur (reprise)
+  const sync = { privVersion: 0, privBase: null, sharedVersion: 0, sharedBase: null, sharedExists: false };
+  let dirty = false;             // modifié, pas encore écrit localement
+  let cloudDirty = false;        // écrit localement, pas encore envoyé
+  let lastSavedAt = null, lastSyncAt = null;
+  let saving = null, saveAgain = false;
+  let pushing = null, pushAgain = false;
+
+  const userKey = () => "user:" + uid;
+  const pick = (s, keys) => { const o = {}; keys.forEach(k => { if (s && s[k] !== undefined) o[k] = s[k]; }); return o; };
+  const privPart = s => pick(s, PRIVATE_KEYS);
+  const sharedPart = s => pick(s, SHARED_KEYS);
+  const parse = t => { try { return t ? JSON.parse(t) : null; } catch (e) { return null; } };
+  const isObj = v => v && typeof v === "object" && !Array.isArray(v);
+
+  /* ---------------------------------------------------- Fusion à trois voies */
+  function mergeList(base, mine, theirs) {
+    const hasIds = [...base, ...mine, ...theirs].every(x => isObj(x) && x.id !== undefined);
+    if (!hasIds) return JSON.stringify(mine) !== JSON.stringify(base) ? mine : theirs;
+    const B = new Map(base.map(x => [x.id, x]));
+    const M = new Map(mine.map(x => [x.id, x]));
+    const out = new Map(theirs.map(x => [x.id, x]));
+    for (const id of B.keys()) if (!M.has(id)) out.delete(id);                       // supprimé ici
+    for (const [id, x] of M) {                                                       // ajouté ou modifié ici
+      const b = B.get(id);
+      if (!b || JSON.stringify(b) !== JSON.stringify(x)) out.set(id, x);
+    }
+    return [...out.values()];
+  }
+  function mergeObj(base, mine, theirs) {
+    const out = Object.assign({}, theirs);
+    new Set([...Object.keys(mine), ...Object.keys(base)]).forEach(k => {
+      if (JSON.stringify(mine[k]) === JSON.stringify(base[k])) return;
+      if (k in mine) out[k] = mine[k]; else delete out[k];
+    });
+    return out;
+  }
+  function merge3(base, mine, theirs) {
+    base = base || {}; mine = mine || {}; theirs = theirs || {};
+    const out = {};
+    new Set([...Object.keys(theirs), ...Object.keys(mine)]).forEach(k => {
+      const b = base[k], m = mine[k], t = theirs[k];
+      if (Array.isArray(m) || Array.isArray(t)) out[k] = mergeList(Array.isArray(b) ? b : [], Array.isArray(m) ? m : [], Array.isArray(t) ? t : []);
+      else if (isObj(m) && isObj(t)) out[k] = mergeObj(isObj(b) ? b : {}, m, t);
+      else out[k] = JSON.stringify(m) !== JSON.stringify(b) ? m : t;
+    });
+    return out;
+  }
+
+  /* ------------------------------------------------------------- Serveur */
+  const connected = () => !!(uid && typeof Cloud !== "undefined" && Cloud.session());
+  async function fetchPriv(cols) {
+    const { data, error } = await Cloud.client().from("user_workspaces").select(cols || "data, version").eq("user_id", uid).maybeSingle();
+    if (error) throw error;
+    return data || null;
+  }
+  async function fetchShared(cols) {
+    const { data, error } = await Cloud.client().from("workspace_documents").select(cols || "data, version").eq("doc_key", SHARED_DOC).maybeSingle();
+    if (error) throw error;
+    return data || null;
+  }
+
+  function applyPart(which, data) {
+    const keys = which === "priv" ? PRIVATE_KEYS : SHARED_KEYS;
+    keys.forEach(k => { if (data && data[k] !== undefined) db[k] = data[k]; else if (which === "priv") delete db[k]; });
+    migrate(db);
+  }
+
+  async function legacySnapshot() {
+    let l = null;
+    try { l = await local.get(LEGACY_KEY); } catch (e) { /* ignore */ }
+    if (!l) { try { const raw = localStorage.getItem(LEGACY_LS); l = raw ? JSON.parse(raw) : null; } catch (e) { /* ignore */ } }
+    return l ? migrate(l) : null;
+  }
 
   /* ---------------------------------------------------------- Cycle de vie */
   async function init() {
-    // Choix du driver le plus durable disponible.
-    const candidates = [IdbDriver, LsDriver, MemDriver];
-    for (const d of candidates) {
-      try {
-        const loaded = await d.load();
-        driver = d;
-        if (loaded) { db = migrate(loaded); }
-        break;
-      } catch (e) { /* driver suivant */ }
+    local = await pickLocal();
+    const p = typeof Cloud !== "undefined" ? Cloud.profile() : null;
+    uid = p ? p.id : null;
+    canShared = !!p && ["admin", "responsable"].includes(p.role);
+    legacy = await legacySnapshot();
+
+    if (!uid) {                                   // sans compte (ne devrait pas arriver) : base locale d'origine
+      db = legacy || Seed.build();
+      Core.Bus.emit("repo:ready", { driver: local.name });
+      return db;
     }
-    if (!db) {
-      // Reprise éventuelle d'une sauvegarde localStorage si on est passé sur IndexedDB.
-      if (driver !== LsDriver) {
-        try { const legacy = await LsDriver.load(); if (legacy) db = migrate(legacy); } catch (e) { /* ignore */ }
+
+    // 1. Copie locale de CE compte (jamais celle d'un autre)
+    let cache = null;
+    try { cache = await local.get(userKey()); } catch (e) { /* ignore */ }
+    if (cache && cache.uid === uid && cache.data) {
+      db = migrate(cache.data);
+      Object.assign(sync, cache.sync || {});
+    }
+
+    // 2. Serveur : espace privé + espace commun
+    let rp = null, rs = null;
+    try { [rp, rs] = await Promise.all([fetchPriv(), fetchShared()]); online = true; }
+    catch (e) { online = false; console.warn("Serveur injoignable : copie locale utilisée", e); }
+
+    if (online) {
+      const mine = db ? privPart(db) : null, mineShared = db ? sharedPart(db) : null;
+      // Privé
+      let priv;
+      if (rp) {
+        const pending = mine && JSON.stringify(mine) !== sync.privBase;
+        priv = !pending ? rp.data : rp.version === sync.privVersion ? mine : merge3(parse(sync.privBase), mine, rp.data);
+        sync.privVersion = rp.version; sync.privBase = JSON.stringify(rp.data);
+      } else {
+        priv = mine || { projects: [], dpeInbox: [], meta: { schemaVersion: 1, createdAt: Core.nowIso() } };
+        sync.privVersion = 0; sync.privBase = null;
       }
+      // Commun
+      let shared;
+      if (rs) {
+        const pending = canShared && mineShared && JSON.stringify(mineShared) !== sync.sharedBase;
+        shared = !pending ? rs.data : rs.version === sync.sharedVersion ? mineShared : merge3(parse(sync.sharedBase), mineShared, rs.data);
+        sync.sharedVersion = rs.version; sync.sharedBase = JSON.stringify(rs.data); sync.sharedExists = true;
+      } else {
+        // Pas encore de catalogue commun : le premier administrateur / Responsable BET le crée
+        // à partir du catalogue de son navigateur (ou du catalogue d'origine).
+        shared = mineShared || sharedPart(legacy || Seed.build());
+        sync.sharedVersion = 0; sync.sharedBase = null; sync.sharedExists = false;
+      }
+      db = migrate(Object.assign({}, shared, priv));
+      lastSyncAt = Core.nowIso();
     }
-    if (!db) { db = Seed.build(); await flush(); }
-    Core.Bus.emit("repo:ready", { driver: driver.name });
+
+    if (!db) {                                    // hors ligne et aucune copie locale
+      db = migrate(Object.assign({}, sharedPart(legacy || Seed.build()), { projects: [], dpeInbox: [] }));
+    }
+
+    await saveLocal();
+    cloudDirty = pendingCloud();
+    if (online && cloudDirty) push();
+    Core.Bus.emit("repo:ready", { driver: driverName() });
     return db;
   }
 
@@ -1592,23 +1720,179 @@ const Repo = (() => {
   }
 
   const state = () => db;
-  const driverName = () => driver.name;
   const isDirty = () => dirty;
   const savedAt = () => lastSavedAt;
-
-  async function flush() {
-    if (saving) return false;
-    saving = true;
-    try {
-      const ok = await driver.save(db);
-      if (ok !== false) { dirty = false; lastSavedAt = Core.nowIso(); Core.Bus.emit("repo:saved", lastSavedAt); }
-      return ok;
-    } catch (e) {
-      console.error("Échec de sauvegarde", e);
-      Core.Bus.emit("repo:error", e);
-      return false;
-    } finally { saving = false; }
+  const isOnline = () => online;
+  const syncedAt = () => lastSyncAt;
+  const canWriteShared = () => canShared;
+  function driverName() {
+    if (!uid) return local.name;
+    return online ? "en ligne · espace privé" : "cet appareil (hors ligne)";
   }
+  function pendingCloud() {
+    if (!uid || !db) return false;
+    if (JSON.stringify(privPart(db)) !== sync.privBase) return true;
+    return canShared && JSON.stringify(sharedPart(db)) !== sync.sharedBase;
+  }
+  const hasPendingCloud = () => cloudDirty || !!pushing;
+
+  async function saveLocal() {
+    if (!uid) return local.put(LEGACY_KEY, db);
+    return local.put(userKey(), { v: 2, uid, data: db, sync: Object.assign({}, sync), savedAt: Core.nowIso() });
+  }
+
+  /** Écrit la base localement puis programme l'envoi en ligne. */
+  async function flush() {
+    if (saving) { saveAgain = true; await saving; return true; }
+    let ok = true;
+    saving = (async () => {
+      try {
+        do {
+          saveAgain = false;
+          await saveLocal();
+        } while (saveAgain);
+        dirty = false; lastSavedAt = Core.nowIso();
+        Core.Bus.emit("repo:saved", lastSavedAt);
+      } catch (e) {
+        ok = false;
+        console.error("Échec de sauvegarde", e);
+        Core.Bus.emit("repo:error", e);
+      }
+    })();
+    await saving; saving = null;
+    if (uid) { cloudDirty = true; schedulePush(); }
+    return ok;
+  }
+
+  /* --------------------------------------------------- Envoi vers le serveur */
+  async function pushPart(which) {
+    const isPriv = which === "priv";
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const data = isPriv ? privPart(db) : sharedPart(db);
+      const json = JSON.stringify(data);
+      const base = isPriv ? sync.privBase : sync.sharedBase;
+      if (json === base) return false;
+      const version = (isPriv ? sync.privVersion : sync.sharedVersion) || null;
+      const sb = Cloud.client();
+      const { data: v, error } = isPriv
+        ? await sb.rpc("save_my_workspace", { p_version: version, p_data: data })
+        : await sb.rpc("save_workspace", { p_doc_key: SHARED_DOC, p_version: version, p_data: data });
+      if (error) throw error;
+      if (v !== -1 && v !== null && v !== undefined) {
+        if (isPriv) { sync.privVersion = v; sync.privBase = json; }
+        else { sync.sharedVersion = v; sync.sharedBase = json; sync.sharedExists = true; }
+        return true;
+      }
+      // Modifié ailleurs entre-temps (autre appareil, autre responsable) : on fusionne et on réessaie.
+      const remote = isPriv ? await fetchPriv() : await fetchShared();
+      if (!remote) { if (isPriv) { sync.privVersion = 0; sync.privBase = null; } else { sync.sharedVersion = 0; sync.sharedBase = null; } continue; }
+      applyPart(which, merge3(parse(base), data, remote.data));
+      if (isPriv) { sync.privVersion = remote.version; sync.privBase = JSON.stringify(remote.data); }
+      else { sync.sharedVersion = remote.version; sync.sharedBase = JSON.stringify(remote.data); }
+      Core.Bus.emit("repo:remote", which);
+    }
+    throw new Error("Enregistrement en ligne impossible (modifications concurrentes).");
+  }
+
+  async function push() {
+    if (!connected()) return false;
+    if (pushing) { pushAgain = true; return pushing; }
+    pushing = (async () => {
+      try {
+        do {
+          pushAgain = false;
+          await pushPart("priv");
+          if (canShared) await pushPart("shared");
+        } while (pushAgain);
+        online = true; lastSyncAt = Core.nowIso();
+        cloudDirty = pendingCloud();
+      } catch (e) {
+        online = false;
+        console.warn("Synchronisation impossible, nouvel essai plus tard", e);
+        setTimeout(() => { if (cloudDirty) push(); }, 30000);
+      }
+      try { await saveLocal(); } catch (e) { /* ignore */ }
+    })();
+    await pushing; pushing = null;
+    Core.Bus.emit("repo:synced", { online });
+    return !cloudDirty;
+  }
+  const schedulePush = Core.debounce(() => { push(); }, 1200);
+
+  /** Envoi immédiat (déconnexion, bouton « Enregistrer maintenant »). */
+  async function syncNow() {
+    await flush();
+    if (pushing) await pushing;
+    await push();
+    return !cloudDirty;
+  }
+
+  /** Récupère les changements faits ailleurs (autre appareil, catalogue modifié par un responsable). */
+  let lastRefresh = 0;
+  async function refresh(force) {
+    if (!connected() || dirty || cloudDirty || pushing || saving) return false;
+    if (!force && Date.now() - lastRefresh < 30000) return false;
+    lastRefresh = Date.now();
+    let changed = false;
+    try {
+      const [vp, vs] = await Promise.all([fetchPriv("version"), fetchShared("version")]);
+      online = true;
+      const tasks = [];
+      if (vp && vp.version !== sync.privVersion) tasks.push(fetchPriv().then(r => ["priv", r]));
+      if (vs && vs.version !== sync.sharedVersion) tasks.push(fetchShared().then(r => ["shared", r]));
+      const got = await Promise.all(tasks);
+      if (dirty || cloudDirty || pushing) return false;       // l'utilisateur a modifié entre-temps : on n'écrase rien
+      got.forEach(([which, r]) => {
+        if (!r) return;
+        applyPart(which, r.data);
+        if (which === "priv") { sync.privVersion = r.version; sync.privBase = JSON.stringify(r.data); }
+        else { sync.sharedVersion = r.version; sync.sharedBase = JSON.stringify(r.data); sync.sharedExists = true; }
+        changed = true;
+      });
+      lastSyncAt = Core.nowIso();
+    } catch (e) { online = false; }
+    if (changed) { await saveLocal(); Core.Bus.emit("repo:remote", "refresh"); }
+    Core.Bus.emit("repo:synced", { online });
+    return changed;
+  }
+
+  /** Efface la copie locale de ce compte (déconnexion sur un poste partagé). */
+  async function forgetLocal() {
+    if (!uid) return;
+    try { await local.del(userKey()); } catch (e) { /* ignore */ }
+  }
+
+  /* ------------------------------------- Anciennes données du navigateur (avant la v1.3) */
+  function legacyInfo() {
+    if (!legacy) return null;
+    const projects = (legacy.projects || []).length, dpe = (legacy.dpeInbox || []).length;
+    return projects || dpe ? { projects, dpe, list: (legacy.projects || []).map(p => ({ id: p.id, name: p.name, city: p.city, updatedAt: p.updatedAt, dpes: (p.dpes || []).length })) } : null;
+  }
+  async function importLegacy(projectIds, withInbox) {
+    if (!legacy) return 0;
+    const ids = new Set(projectIds || []);
+    const have = new Set(db.projects.map(p => p.id));
+    let n = 0;
+    (legacy.projects || []).filter(p => ids.has(p.id)).forEach(p => {
+      const c = Core.clone(p);
+      if (have.has(c.id)) c.id = Core.uid("prj");
+      db.projects.push(c); n++;
+    });
+    if (withInbox) {
+      const haveD = new Set(db.dpeInbox.map(r => r.id));
+      (legacy.dpeInbox || []).forEach(r => { if (!haveD.has(r.id)) { db.dpeInbox.push(Core.clone(r)); n++; } });
+    }
+    db.meta.legacyHandled = Core.nowIso();
+    touch("import");
+    await flush();
+    return n;
+  }
+  async function dropLegacy() {
+    try { await local.del(LEGACY_KEY); } catch (e) { /* ignore */ }
+    try { localStorage.removeItem(LEGACY_LS); } catch (e) { /* ignore */ }
+    legacy = null;
+  }
+  async function markLegacyHandled() { db.meta.legacyHandled = Core.nowIso(); touch("meta"); await flush(); }
 
   const scheduleSave = Core.debounce(() => { flush(); }, 500);
 
@@ -1725,37 +2009,67 @@ const Repo = (() => {
 
   /* --------------------------------------------------- Sauvegarde / restauration */
   function exportJSON() {
-    return JSON.stringify({ exportedAt: Core.nowIso(), app: "BET Chiffrage", data: db }, null, 2);
+    return JSON.stringify({ exportedAt: Core.nowIso(), app: "BET Chiffrage", data: Object.assign(privPart(db), sharedPart(db)) }, null, 2);
   }
 
+  /**
+   * Restauration d'une sauvegarde JSON. Les projets et DPE vont dans l'espace
+   * privé du compte ; le catalogue commun n'est remplacé que par un
+   * administrateur ou un Responsable BET.
+   */
   async function importJSON(text, { merge = false } = {}) {
     const parsed = JSON.parse(text);
     const incoming = parsed && parsed.data ? parsed.data : parsed;
     if (!incoming || !Array.isArray(incoming.items)) throw new Error("Fichier de sauvegarde non reconnu");
+    migrate(incoming);
     if (!merge) {
-      db = migrate(incoming);
+      const shared = canShared || !uid ? sharedPart(incoming) : sharedPart(db);
+      db = migrate(Object.assign({}, shared, { meta: db.meta, projects: incoming.projects, dpeInbox: incoming.dpeInbox }));
     } else {
-      const byLabel = new Set(db.items.map(i => Core.norm(i.label)));
-      (incoming.items || []).forEach(i => { if (!byLabel.has(Core.norm(i.label))) db.items.push(i); });
+      if (canShared || !uid) {
+        const byLabel = new Set(db.items.map(i => Core.norm(i.label)));
+        (incoming.items || []).forEach(i => { if (!byLabel.has(Core.norm(i.label))) db.items.push(i); });
+      }
       const projIds = new Set(db.projects.map(p => p.id));
       (incoming.projects || []).forEach(p => { if (!projIds.has(p.id)) db.projects.push(p); });
+      const dpeIds = new Set(db.dpeInbox.map(r => r.id));
+      (incoming.dpeInbox || []).forEach(r => { if (!dpeIds.has(r.id)) db.dpeInbox.push(r); });
     }
     touch("import");
     await flush();
     return db;
   }
 
-  async function resetToSeed() {
-    db = Seed.build();
+  /** Vide l'espace privé du compte (projets et DPE). */
+  async function resetPrivate() {
+    db.projects = []; db.dpeInbox = [];
     touch("reset");
     await flush();
+    return db;
+  }
+  /** Rétablit le catalogue et les référentiels d'origine (espace commun). */
+  async function resetShared() {
+    if (uid && !canShared) throw new Error("Réservé à l'administrateur et au Responsable BET.");
+    Object.assign(db, sharedPart(Seed.build()));
+    migrate(db);
+    touch("reset");
+    await flush();
+    return db;
+  }
+  async function resetToSeed() {
+    await resetPrivate();
+    if (!uid || canShared) await resetShared();
     return db;
   }
 
   return {
     init, state, flush, touch, driverName, isDirty, savedAt,
     categories, items, units, vatRates, coefficients, aidRules, feeTemplates, users, projects, settings,
-    exportJSON, importJSON, resetToSeed,
+    exportJSON, importJSON, resetToSeed, resetPrivate, resetShared,
+    // Espace en ligne
+    syncNow, refresh, isOnline, syncedAt, hasPendingCloud, canWriteShared, forgetLocal,
+    legacyInfo, importLegacy, dropLegacy, markLegacyHandled,
+    _merge3: merge3,
   };
 })();
 
@@ -3979,11 +4293,13 @@ const App = (() => {
   function updateSaveStatus() {
     const el = document.getElementById("save-status");
     if (!el) return;
-    const dirty = Repo.isDirty();
-    const at = Repo.savedAt();
-    el.innerHTML = dirty
-      ? `<span class="dot pending"></span><span>Modifications en cours…</span>`
-      : `<span class="dot"></span><span>Enregistré ${at ? Core.dateTimeFR(at).slice(-5) : ""} · ${esc(Repo.driverName())}</span>`;
+    const at = Repo.syncedAt();
+    el.title = "Vos projets et DPE sont enregistrés dans votre espace privé : vous seul y avez accès.";
+    el.innerHTML = !Repo.isOnline()
+      ? `<span class="dot pending"></span><span>Hors ligne · gardé sur cet appareil</span>`
+      : Repo.isDirty() || Repo.hasPendingCloud()
+        ? `<span class="dot pending"></span><span>Enregistrement en ligne…</span>`
+        : `<span class="dot"></span><span>Enregistré en ligne ${at ? Core.dateTimeFR(at).slice(-5) : ""} · privé</span>`;
   }
 
   /* -------------------------------------------------------- Recherche globale */
@@ -4038,10 +4354,10 @@ const App = (() => {
         <div>
           <div class="lbl">Où sont mes données ?</div>
           <p class="small muted" style="margin-top:6px">
-            Elles sont enregistrées automatiquement dans le stockage de ce navigateur
-            (${esc(Repo.driverName())}) et survivent au rechargement de la page.
-            Pour les transporter d'un poste à l'autre ou les archiver, utilisez
-            <strong>Paramètres → Données → Exporter la sauvegarde</strong>.
+            Vos projets et vos DPE sont enregistrés automatiquement <strong>en ligne, dans votre espace privé</strong> :
+            aucun autre compte ne peut les voir, et vous les retrouvez sur n'importe quel ordinateur.
+            Le catalogue de prix et les référentiels sont communs au bureau d'études.
+            Pour archiver un état, utilisez <strong>Paramètres → Données → Exporter la sauvegarde</strong>.
           </p>
         </div>
         <div>
@@ -4133,11 +4449,22 @@ const App = (() => {
     bindShortcuts();
     Core.Bus.on("repo:changed", () => updateSaveStatus());
     Core.Bus.on("repo:saved", () => updateSaveStatus());
+    Core.Bus.on("repo:synced", () => updateSaveStatus());
+    Core.Bus.on("repo:remote", () => { if (!document.querySelector(".overlay")) render(); else updateSaveStatus(); });
+    // Récupère les changements faits ailleurs (autre appareil, catalogue mis à jour par un responsable).
+    const refreshSoon = () => { if (document.visibilityState === "visible") Repo.refresh(); };
+    document.addEventListener("visibilitychange", refreshSoon);
+    window.addEventListener("focus", refreshSoon);
+    setInterval(() => Repo.refresh(), 5 * 60 * 1000);
     Core.Bus.on("repo:error", () => UI.toast("Sauvegarde impossible : espace de stockage saturé ou refusé par le navigateur. Exportez une sauvegarde depuis Paramètres → Données.", "err", 9000));
     window.addEventListener("hashchange", () => { readHash(); render(); });
-    window.addEventListener("beforeunload", () => { if (Repo.isDirty()) Repo.flush(); });
+    window.addEventListener("beforeunload", e => {
+      if (Repo.isDirty()) Repo.flush();
+      if (Repo.hasPendingCloud()) { e.preventDefault(); e.returnValue = ""; }
+    });
     render();
     if (Auth.role() === "admin") Views.Support.load();
+    Privacy.offerLegacy();
     Hero.fetchSetting();
     { const before = JSON.stringify(Don.get()); Don.fetchSetting().then(c => { if (JSON.stringify(c) !== before) render(); }); }
     // Photo d'accueil (Paramètres → Page d'accueil)
@@ -7497,7 +7824,18 @@ Views.Users = (() => {
     const dn = m.el.querySelector('[data-acc="don"]');
     if (dn) dn.addEventListener("click", () => { m.close(); Don.dialog(); });
     m.el.querySelector('[data-acc="out"]').addEventListener("click", async () => {
-      await Repo.flush(); await Cloud.signOut(); location.reload();
+      // Tout envoyer dans l'espace privé en ligne, puis effacer la copie de cet appareil.
+      const synced = await Repo.syncNow();
+      if (!synced) {
+        const go = await UI.confirm({
+          title: "Modifications pas encore envoyées",
+          message: "Certaines modifications n'ont pas pu être enregistrées en ligne (connexion internet ?).",
+          detail: "Elles restent sur cet appareil et partiront à votre prochaine connexion ici.",
+          confirmLabel: "Se déconnecter quand même",
+        });
+        if (!go) return;
+      } else await Repo.forgetLocal();
+      await Cloud.signOut(); location.reload();
     });
   }
 
@@ -7511,7 +7849,7 @@ Views.Users = (() => {
       if (!isAdmin()) return UI.toast("La suppression des comptes est réservée à l'administrateur.", "warn");
       const u = find(d.id); if (!u) return;
       const ok = await UI.confirm({ title: "Supprimer ce compte ?", message: (u.full_name || "") + " — " + u.email,
-        detail: "La personne ne pourra plus se connecter. Pour une suspension temporaire, préférez la désactivation.",
+        detail: "La personne ne pourra plus se connecter et ses projets enregistrés en ligne seront définitivement supprimés. Pour une suspension temporaire, préférez la désactivation.",
         confirmLabel: "Supprimer définitivement", danger: true });
       if (!ok) return;
       try { await Cloud.admin("delete", { id: u.id }); UI.toast("Compte supprimé.", "ok"); load(); }
@@ -7769,8 +8107,9 @@ Views.Dashboard = (() => {
       <div class="card">
         <div class="card-body row between">
           <div class="small muted">
-            ${icon("save", 14)} Données enregistrées dans ce navigateur (${esc(Repo.driverName())}) —
-            ${Repo.savedAt() ? "dernière sauvegarde " + Core.dateTimeFR(Repo.savedAt()) : "sauvegarde automatique active"}.
+            ${icon("lock", 14)} ${Repo.isOnline()
+              ? "Vos projets et DPE sont enregistrés en ligne dans votre espace privé : vous seul y avez accès"
+              : "Hors ligne : vos modifications sont gardées sur cet appareil et partiront au retour du réseau"}${Repo.syncedAt() ? " — dernier envoi " + Core.dateTimeFR(Repo.syncedAt()) : ""}.
           </div>
           <div class="small muted-3">${esc(s.bureauName || "Bureau d'études")} · ${esc(Auth.name())} (${esc(Auth.roleLabel())})</div>
         </div>
@@ -8324,50 +8663,7 @@ Views.Settings = (() => {
   }
 
   /* ------------------------------------------------------------- Données */
-  function donnees() {
-    const db = Repo.state();
-    const size = (() => { try { return (JSON.stringify(db).length / 1024).toFixed(0) + " Ko"; } catch (e) { return "—"; } })();
-    return `<div class="stack">
-      <div class="stat-grid">
-        ${Frag.stat("Support de stockage", esc(Repo.driverName()), "Navigateur local")}
-        ${Frag.stat("Volume", size, "Données du bureau")}
-        ${Frag.stat("Projets", String(db.projects.length), db.projects.reduce((a, p) => a + (p.scenarios || []).length, 0) + " scénarios")}
-        ${Frag.stat("Dernière sauvegarde", Repo.savedAt() ? dateTimeFR(Repo.savedAt()).slice(-5) : "—", Repo.savedAt() ? dateFR(Repo.savedAt()) : "")}
-      </div>
-
-      <div class="card">
-        <div class="card-head"><h3>Sauvegarde et restauration</h3></div>
-        <div class="card-body stack-sm">
-          <p class="small muted">La sauvegarde JSON contient l'intégralité de la base : catalogue, référentiels,
-            projets, scénarios et historiques de prix. C'est le fichier à conserver et à transporter d'un poste à l'autre.</p>
-          <div class="row">
-            <button class="btn" data-act="setSaveNow">${icon("save", 15)} Enregistrer maintenant</button>
-            <button class="btn" data-act="setExport">${icon("download", 15)} Exporter la sauvegarde (JSON)</button>
-            <button class="btn" data-act="setImport">${icon("upload", 15)} Restaurer une sauvegarde</button>
-            <button class="btn" data-act="catExport">${icon("download", 15)} Exporter le catalogue (Excel)</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head"><h3>Migration vers une base PostgreSQL</h3></div>
-        <div class="card-body">
-          <p class="small muted">L'accès aux données passe par une couche unique (<span class="mono">Repo</span>)
-            dont le pilote de stockage est interchangeable. Le passage à Supabase/PostgreSQL consiste à substituer
-            ce pilote : aucun écran ni calcul n'est à réécrire. Le dépôt Next.js + TypeScript livré avec
-            l'application contient le schéma SQL, les politiques RLS et le script d'import de cette sauvegarde JSON.</p>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head"><h3>Zone sensible</h3></div>
-        <div class="card-body row">
-          <button class="btn btn-danger" data-act="setReset">${icon("refresh", 15)} Réinitialiser aux données d'origine</button>
-          <span class="small muted-3">Supprime les projets et rétablit le catalogue initial (60 postes, 8 catégories).</span>
-        </div>
-      </div>
-    </div>`;
-  }
+  function donnees() { return Privacy.donnees(); }
 
   /* ---------------------------------------------------- Éditeur générique */
   function simpleDialog(title, sub, fields, onSave) {
@@ -8670,6 +8966,176 @@ Views.Settings = (() => {
   return { render, actions: () => "" };
 })();
 
+
+/* ===== 13e-privacy.js ================================================ */
+/* =========================================================================
+ * 13e — ESPACES PRIVÉS : reprise des anciennes données du navigateur,
+ * écran Paramètres → Données, actions d'enregistrement et de remise à zéro.
+ * ========================================================================= */
+const Privacy = (() => {
+  "use strict";
+  const { esc, dateFR, dateTimeFR } = Core;
+  const icon = UI.icon;
+
+  /** Anciennes données (base commune du navigateur avant la v1.3) : chacun récupère les siennes. */
+  function legacyDialog() {
+    const info = Repo.legacyInfo();
+    if (!info) return UI.toast("Aucune ancienne donnée sur ce navigateur.", "ok");
+    const m = UI.modal({
+      title: "Récupérer mes anciens projets",
+      sub: "Données enregistrées sur ce navigateur avant la mise en place des espaces privés",
+      body: `<div class="stack">
+        <div class="notice">${icon("lock", 15)}<div>Désormais, chaque compte a son <strong>espace privé en ligne</strong> : vous seul voyez vos projets et vos DPE.
+          Avant cette mise à jour, tous les comptes utilisés sur ce navigateur partageaient la même base.
+          Cochez uniquement ce qui <strong>vous appartient</strong> : ce sera copié dans votre espace privé.</div></div>
+        <div class="legacy-list">
+          ${info.list.map(p => `<label class="legacy-row">
+              <input type="checkbox" name="lp" value="${esc(p.id)}">
+              <span class="legacy-txt"><strong>${esc(p.name || "Projet sans nom")}</strong>
+                <span class="xsmall muted-3">${esc([p.city, p.updatedAt ? "modifié le " + dateFR(p.updatedAt) : "", p.dpes ? p.dpes + " DPE" : ""].filter(Boolean).join(" · "))}</span></span>
+            </label>`).join("")}
+          ${info.dpe ? `<label class="legacy-row"><input type="checkbox" name="linbox">
+              <span class="legacy-txt"><strong>${info.dpe} DPE importé${info.dpe > 1 ? "s" : ""}</strong>
+                <span class="xsmall muted-3">en attente dans l'espace d'analyse DPE</span></span></label>` : ""}
+        </div>
+        <p class="xsmall muted-3">Vous pourrez rouvrir cette fenêtre depuis Paramètres → Données.</p>
+      </div>`,
+      footer: `<button class="btn btn-ghost left" data-lg="drop">${icon("trash", 14)} Effacer de ce navigateur</button>
+               <button class="btn" data-lg="skip">Plus tard</button>
+               <button class="btn btn-primary" data-lg="import">${icon("check", 15)} Récupérer la sélection</button>`,
+    });
+    m.el.querySelector('[data-lg="import"]').addEventListener("click", async () => {
+      const ids = [...m.el.querySelectorAll('[name="lp"]:checked')].map(i => i.value);
+      const inbox = !!(m.el.querySelector('[name="linbox"]') || {}).checked;
+      if (!ids.length && !inbox) return UI.toast("Cochez au moins un élément, ou choisissez « Plus tard ».", "warn");
+      const n = await Repo.importLegacy(ids, inbox);
+      m.close();
+      UI.toast(n + " élément" + (n > 1 ? "s" : "") + " récupéré" + (n > 1 ? "s" : "") + " dans votre espace privé.", "ok", 4000);
+      App.render();
+    });
+    m.el.querySelector('[data-lg="skip"]').addEventListener("click", async () => { await Repo.markLegacyHandled(); m.close(); });
+    m.el.querySelector('[data-lg="drop"]').addEventListener("click", async () => {
+      const ok = await UI.confirm({
+        title: "Effacer les anciennes données de ce navigateur ?",
+        message: "Elles ne seront plus proposées à aucun compte sur ce navigateur.",
+        detail: "Faites-le quand chacun a récupéré ses projets. Les espaces privés en ligne ne sont pas concernés.",
+        confirmLabel: "Effacer", danger: true,
+      });
+      if (!ok) return;
+      await Repo.dropLegacy(); await Repo.markLegacyHandled();
+      m.close(); UI.toast("Anciennes données effacées de ce navigateur.", "ok"); App.render();
+    });
+  }
+
+  /** Proposé une fois par compte, à la première connexion après la mise à jour. */
+  function offerLegacy() {
+    const db = Repo.state();
+    if (Repo.legacyInfo() && !(db.meta && db.meta.legacyHandled)) setTimeout(legacyDialog, 500);
+  }
+
+  /** Paramètres → Données */
+  function donnees() {
+    const db = Repo.state();
+    const size = (() => { try { return (JSON.stringify(db).length / 1024).toFixed(0) + " Ko"; } catch (e) { return "—"; } })();
+    const shared = Repo.canWriteShared();
+    const legacy = Repo.legacyInfo();
+    const on = Repo.isOnline();
+    return `<div class="stack">
+      <div class="stat-grid">
+        ${Frag.stat("Enregistrement", on ? "En ligne" : "Hors ligne", on ? "dans votre espace privé" : "copie sur cet appareil, envoyée au retour du réseau", on ? "accent" : "ember")}
+        ${Frag.stat("Mes projets", String(db.projects.length), db.projects.reduce((a, p) => a + (p.scenarios || []).length, 0) + " scénarios · " + ((db.dpeInbox || []).length) + " DPE en attente")}
+        ${Frag.stat("Volume", size, "vos données + catalogue commun")}
+        ${Frag.stat("Dernier envoi", Repo.syncedAt() ? dateTimeFR(Repo.syncedAt()).slice(-5) : "—", Repo.syncedAt() ? dateFR(Repo.syncedAt()) : "")}
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Confidentialité</h3></div>
+        <div class="card-body grid-2">
+          <div class="privacy-box"><span class="privacy-ic">${icon("lock", 18)}</span><div>
+            <strong>Espace privé</strong>
+            <p class="small muted">Vos projets, chiffrages et DPE importés (Excel) sont enregistrés en ligne dans votre espace personnel.
+              <strong>Aucun autre compte ne peut les voir, administrateur compris.</strong> Vous les retrouvez sur n'importe quel ordinateur en vous connectant.</p></div></div>
+          <div class="privacy-box"><span class="privacy-ic">${icon("book", 18)}</span><div>
+            <strong>Catalogue commun du bureau</strong>
+            <p class="small muted">Le catalogue de prix, les référentiels (TVA, unités, coefficients, aides, frais) et les informations du bureau sont partagés par tous les comptes.
+              ${shared ? "Vous pouvez les modifier : vos changements s'appliquent à tout le bureau." : "Ils sont tenus à jour par l'administrateur et le Responsable BET."}</p></div></div>
+        </div>
+      </div>
+
+      ${legacy ? `<div class="card">
+        <div class="card-head"><h3>Anciennes données de ce navigateur</h3></div>
+        <div class="card-body row between" style="gap:12px;flex-wrap:wrap">
+          <p class="small muted" style="margin:0;max-width:640px">Ce navigateur contient encore l'ancienne base commune (${legacy.projects} projet${legacy.projects > 1 ? "s" : ""}${legacy.dpe ? ", " + legacy.dpe + " DPE" : ""}),
+            d'avant la mise en place des espaces privés. Récupérez ce qui vous appartient, puis effacez-la quand chacun a repris ses projets.</p>
+          <button class="btn btn-primary" data-act="prvLegacy">${icon("download", 15)} Récupérer mes anciens projets</button>
+        </div></div>` : ""}
+
+      <div class="card">
+        <div class="card-head"><h3>Sauvegarde et restauration</h3></div>
+        <div class="card-body stack-sm">
+          <p class="small muted">L'enregistrement en ligne est automatique. Le fichier de sauvegarde (JSON) contient vos projets et DPE ainsi que le catalogue commun :
+            utile pour archiver un état. Une restauration remplace vos projets ; le catalogue commun n'est remplacé que par l'administrateur ou le Responsable BET.</p>
+          <div class="row">
+            <button class="btn" data-act="setSaveNow">${icon("save", 15)} Enregistrer maintenant</button>
+            <button class="btn" data-act="setExport">${icon("download", 15)} Exporter la sauvegarde (JSON)</button>
+            <button class="btn" data-act="setImport">${icon("upload", 15)} Restaurer une sauvegarde</button>
+            <button class="btn" data-act="catExport">${icon("download", 15)} Exporter le catalogue (Excel)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Zone sensible</h3></div>
+        <div class="card-body stack-sm">
+          <div class="row" style="gap:12px;flex-wrap:wrap">
+            <button class="btn btn-danger" data-act="prvResetMine">${icon("trash", 15)} Supprimer tous mes projets et DPE</button>
+            <span class="small muted-3">Vide votre espace privé. Le catalogue commun n'est pas touché.</span>
+          </div>
+          ${shared ? `<div class="row" style="gap:12px;flex-wrap:wrap">
+            <button class="btn btn-danger" data-act="prvResetShared">${icon("refresh", 15)} Rétablir le catalogue d'origine</button>
+            <span class="small muted-3">Remplace le catalogue et les référentiels communs pour tout le bureau (60 postes, 8 catégories).</span>
+          </div>` : ""}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  UI.register({
+    prvLegacy: () => legacyDialog(),
+    setSaveNow: async () => {
+      const ok = await Repo.syncNow();
+      UI.toast(ok ? "Enregistré en ligne." : "Enregistré sur cet appareil ; l'envoi en ligne reprendra au retour du réseau.", ok ? "ok" : "warn", 4000);
+      App.updateSaveStatus();
+    },
+    prvResetMine: async () => {
+      const ok = await UI.confirm({
+        title: "Supprimer tous vos projets et DPE ?",
+        message: "Votre espace privé sera vidé, sur tous vos appareils.",
+        detail: "Exportez d'abord une sauvegarde si vous souhaitez pouvoir revenir en arrière. Le catalogue commun n'est pas modifié.",
+        confirmLabel: "Tout supprimer", danger: true,
+      });
+      if (!ok) return;
+      await Repo.resetPrivate(); await Repo.syncNow();
+      UI.toast("Votre espace privé a été vidé.", "ok");
+      App.go("dashboard");
+    },
+    setReset: async () => UI.Actions.prvResetMine(),
+    prvResetShared: async () => {
+      if (!Repo.canWriteShared()) return UI.toast("Réservé à l'administrateur et au Responsable BET.", "warn");
+      const ok = await UI.confirm({
+        title: "Rétablir le catalogue d'origine pour tout le bureau ?",
+        message: "Le catalogue de prix et les référentiels communs seront remplacés pour tous les comptes.",
+        detail: "Les projets déjà chiffrés gardent leurs prix. Exportez le catalogue (Excel) avant si besoin.",
+        confirmLabel: "Rétablir pour tout le bureau", danger: true,
+      });
+      if (!ok) return;
+      try { await Repo.resetShared(); await Repo.syncNow(); UI.toast("Catalogue d'origine rétabli pour tout le bureau.", "ok"); App.render(); }
+      catch (e) { UI.toast(e.message, "err", 6000); }
+    },
+  }, UI.Actions);
+
+  return { legacyDialog, offerLegacy, donnees };
+})();
 
 /* ===== 18-import-export.js =========================================== */
 /* =========================================================================
