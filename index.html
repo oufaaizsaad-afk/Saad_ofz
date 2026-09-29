@@ -6,13 +6,13 @@
 <title>CheckChiffreBet · Chiffrage de rénovation énergétique et analyse DPE</title>
 <meta name="description" content="Plateforme web pour bureaux d'études : analyse des DPE ADEME, chiffrage de scénarios de travaux, aides et reste à charge par lot, DPGF, CCTP et rapports.">
 <link rel="canonical" href="https://checkchiffrebet.pro/">
-<script>(function(){var h=location.hash,q=location.search,own=/^#(top|contenu|presentation|fonctionnalites|apercu|comment-ca-marche|avantages|faq)?$/;if((h&&!own.test(h))||/[?&](code|error|type|token_hash)=/.test(q)){location.replace('/app/'+q+h);}})();</script>
+<script>(function(){var h=location.hash,q=location.search,own=/^#(top|contenu|presentation|fonctionnalites|apercu|comment-ca-marche|avantages|faq)?$/;if((h&&!own.test(h))||/[?&](code|error|type|token_hash)=/.test(q)){location.replace('/app'+q+h);}})();</script>
 <meta name="theme-color" content="#12384A">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="preload" href="/fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/fonts/ibm-plex-serif-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/ibm-plex-serif-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="CheckChiffreBet">
 <meta property="og:locale" content="fr_FR">
@@ -28,9 +28,9 @@
 <meta name="twitter:description" content="Plateforme web pour bureaux d'études : analyse des DPE ADEME, chiffrage de scénarios de travaux, aides et reste à charge par lot, DPGF, CCTP et rapports.">
 <meta name="twitter:image" content="https://checkchiffrebet.pro/og-image.jpg">
 <meta name="twitter:image:alt" content="CheckChiffreBet — du DPE au chiffrage des travaux de rénovation énergétique">
-<style>@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
-@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:600;font-display:swap;src:url(/fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2")}
-@font-face{font-family:"IBM Plex Serif";font-style:normal;font-weight:600;font-display:swap;src:url(/fonts/ibm-plex-serif-latin-600-normal.woff2) format("woff2")}
+<style>@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:600;font-display:swap;src:url(/ibm-plex-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Serif";font-style:normal;font-weight:600;font-display:swap;src:url(/ibm-plex-serif-latin-600-normal.woff2) format("woff2")}
 :root{
 --ink:#0E1C24;--text:#1B2A33;--text-2:#44545E;--text-3:#56666F;
 --ground:#F3F6F8;--surface:#FFFFFF;--line:#DDE5EA;--line-2:#EBF0F3;
@@ -248,7 +248,7 @@ h3{font-size:18px;font-weight:600;line-height:1.35}
       <li><a href="/#faq">FAQ</a></li>
     </ul>
     <div class="nav-cta">
-      <a class="btn btn-primary" href="/app/" data-login>Se connecter</a>
+      <a class="btn btn-primary" href="/app" data-login>Se connecter</a>
       <button class="burger" type="button" aria-controls="menu" aria-expanded="false" aria-label="Ouvrir le menu">
         <svg class="ic ic-open" aria-hidden="true"><use href="#i-menu"/></svg><svg class="ic ic-close" aria-hidden="true"><use href="#i-x"/></svg>
       </button>
@@ -263,7 +263,7 @@ h3{font-size:18px;font-weight:600;line-height:1.35}
         <h1 id="titre">Du DPE au <em>chiffrage des travaux</em> de rénovation énergétique</h1>
         <p class="lead">CheckChiffreBet réunit dans un même espace l'analyse des DPE d'un immeuble, le chiffrage de scénarios de travaux, le calcul des aides et du reste à charge, et la production des livrables&nbsp;: DPGF, CCTP, rapport d'étude et présentation d'assemblée générale.</p>
         <div class="hero-ctas">
-          <a class="btn btn-primary btn-lg" href="/app/" data-login>Se connecter <svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          <a class="btn btn-primary btn-lg" href="/app" data-login>Se connecter <svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></a>
           <a class="btn btn-ghost btn-lg" href="#fonctionnalites">Découvrir les fonctionnalités</a>
         </div>
         <ul class="facts">
@@ -421,10 +421,10 @@ h3{font-size:18px;font-weight:600;line-height:1.35}
         <p class="section-lead">Captures de l'interface réelle, réalisées sur un projet d'exemple aux données fictives.</p>
       </div>
       <div class="shots">
-        <figure class="shot"><img src="/img/apercu-dpe.webp" width="1200" height="750" loading="lazy" decoding="async" alt="Écran Diagnostic DPE : liste des DPE importés d'un immeuble et synthèse multi-logements avec surfaces, consommations et répartition des classes énergie."><figcaption><strong>Synthèse des DPE</strong> d'un immeuble et exploitation dans le chiffrage.</figcaption></figure>
-        <figure class="shot"><img src="/img/apercu-travaux.webp" width="1200" height="750" loading="lazy" decoding="async" alt="Écran Travaux : postes chiffrés d'un scénario de rénovation globale avec unités, prix unitaires, quantités, TVA et totaux par lot."><figcaption><strong>Scénario de travaux</strong> chiffré poste par poste.</figcaption></figure>
-        <figure class="shot"><img src="/img/apercu-performance.webp" width="1200" height="750" loading="lazy" decoding="async" alt="Écran Performance : étiquette énergie avant et après travaux estimée, gain d'énergie primaire, économies annuelles et déperditions par poste."><figcaption><strong>Performance estimée</strong> après travaux et gain énergétique.</figcaption></figure>
-        <figure class="shot"><img src="/img/apercu-coproprietaires.webp" width="1200" height="750" loading="lazy" decoding="async" alt="Écran Copropriétaires : répartition par lot avec tantièmes, catégorie de revenus, quote-part, aides, reste à charge et mensualité."><figcaption><strong>Reste à charge</strong> par copropriétaire.</figcaption></figure>
+        <figure class="shot"><img src="/apercu-dpe.webp" width="1200" height="750" loading="lazy" decoding="async" alt="Écran Diagnostic DPE : liste des DPE importés d'un immeuble et synthèse multi-logements avec surfaces, consommations et répartition des classes énergie."><figcaption><strong>Synthèse des DPE</strong> d'un immeuble et exploitation dans le chiffrage.</figcaption></figure>
+        <figure class="shot"><img src="/apercu-travaux.webp" width="1200" height="750" loading="lazy" decoding="async" alt="Écran Travaux : postes chiffrés d'un scénario de rénovation globale avec unités, prix unitaires, quantités, TVA et totaux par lot."><figcaption><strong>Scénario de travaux</strong> chiffré poste par poste.</figcaption></figure>
+        <figure class="shot"><img src="/apercu-performance.webp" width="1200" height="750" loading="lazy" decoding="async" alt="Écran Performance : étiquette énergie avant et après travaux estimée, gain d'énergie primaire, économies annuelles et déperditions par poste."><figcaption><strong>Performance estimée</strong> après travaux et gain énergétique.</figcaption></figure>
+        <figure class="shot"><img src="/apercu-coproprietaires.webp" width="1200" height="750" loading="lazy" decoding="async" alt="Écran Copropriétaires : répartition par lot avec tantièmes, catégorie de revenus, quote-part, aides, reste à charge et mensualité."><figcaption><strong>Reste à charge</strong> par copropriétaire.</figcaption></figure>
       </div>
     </div>
   </section>
@@ -436,7 +436,7 @@ h3{font-size:18px;font-weight:600;line-height:1.35}
         <h2 id="etapes-titre">Quatre étapes, de l'accès au livrable</h2>
       </div>
       <ol class="steps">
-        <li class="step"><h3>Demandez un accès</h3><p>L'accès se fait sur invitation. Envoyez une <a href="/app/#acces">demande d'accès</a>&nbsp;: l'administrateur crée votre compte et vous transmet vos identifiants.</p></li>
+        <li class="step"><h3>Demandez un accès</h3><p>L'accès se fait sur invitation. Envoyez une <a href="/app#acces">demande d'accès</a>&nbsp;: l'administrateur crée votre compte et vous transmet vos identifiants.</p></li>
         <li class="step"><h3>Connectez-vous</h3><p>Identifiez-vous avec votre e-mail et votre mot de passe depuis un navigateur récent. La double authentification peut être activée.</p></li>
         <li class="step"><h3>Créez le projet et importez les DPE</h3><p>Renseignez l'immeuble et importez ses DPE&nbsp;: synthèse, déperditions et métrés par bâtiment sont générés automatiquement.</p></li>
         <li class="step"><h3>Chiffrez et remettez vos livrables</h3><p>Composez les scénarios, calculez les aides et le reste à charge, puis exportez DPGF, CCTP, rapport et présentation d'AG.</p></li>
@@ -474,7 +474,7 @@ h3{font-size:18px;font-weight:600;line-height:1.35}
         <details><summary>Les autres utilisateurs voient-ils mes projets ?<svg class="ic" aria-hidden="true"><use href="#i-chevronDown"/></svg></summary><div><p>Non. Chaque compte dispose d'un espace privé pour ses projets et ses DPE importés. Un projet n'est visible par un collègue que si vous le partagez avec lui, en lecture seule ou en modification. L'administrateur ne voit pas non plus les projets qui ne lui sont pas partagés. Seul le catalogue de prix est commun au bureau.</p></div></details>
         <details><summary>Les résultats remplacent-ils un audit énergétique réglementaire ?<svg class="ic" aria-hidden="true"><use href="#i-chevronDown"/></svg></summary><div><p>Non. La performance après travaux est estimée par une méthode simplifiée, et les aides sont calculées à partir des règles et montants paramétrés. Ces résultats servent à préparer et comparer les scénarios ; ils ne remplacent ni un calcul 3CL, ni un audit réglementaire, ni l'instruction officielle des dossiers d'aides.</p></div></details>
         <details><summary>Faut-il installer un logiciel ?<svg class="ic" aria-hidden="true"><use href="#i-chevronDown"/></svg></summary><div><p>Non. CheckChiffreBet fonctionne dans un navigateur récent (Chrome, Edge, Firefox ou Safari), sur ordinateur comme sur tablette. Les documents produits s'ouvrent avec Word, Excel ou tout lecteur PDF.</p></div></details>
-        <details><summary>Où sont hébergées les données ?<svg class="ic" aria-hidden="true"><use href="#i-chevronDown"/></svg></summary><div><p>Les comptes et la base de données sont hébergés par Supabase dans l'Union européenne (Irlande). Les fichiers du site sont servis par GitHub Pages. Le détail figure dans la <a href="/confidentialite/">politique de confidentialité</a>.</p></div></details>
+        <details><summary>Où sont hébergées les données ?<svg class="ic" aria-hidden="true"><use href="#i-chevronDown"/></svg></summary><div><p>Les comptes et la base de données sont hébergés par Supabase dans l'Union européenne (Irlande). Les fichiers du site sont servis par GitHub Pages. Le détail figure dans la <a href="/confidentialite">politique de confidentialité</a>.</p></div></details>
       </div>
     </div>
   </section>
@@ -487,8 +487,8 @@ h3{font-size:18px;font-weight:600;line-height:1.35}
           <p>Retrouvez vos projets, vos DPE importés et vos chiffrages. Pas encore de compte&nbsp;? Demandez un accès à l'administrateur.</p>
         </div>
         <div class="cta-actions">
-          <a class="btn btn-light btn-lg" href="/app/" data-login>Se connecter</a>
-          <a class="btn btn-outline-light btn-lg" href="/app/#acces">Demander un accès</a>
+          <a class="btn btn-light btn-lg" href="/app" data-login>Se connecter</a>
+          <a class="btn btn-outline-light btn-lg" href="/app#acces">Demander un accès</a>
         </div>
       </div>
     </div>
@@ -513,16 +513,16 @@ h3{font-size:18px;font-weight:600;line-height:1.35}
       <nav aria-label="Espace de travail">
         <p class="foot-h">Espace</p>
         <ul class="foot-list">
-          <li><a href="/app/" data-login>Se connecter</a></li>
-          <li><a href="/app/#acces">Demander un accès</a></li>
+          <li><a href="/app" data-login>Se connecter</a></li>
+          <li><a href="/app#acces">Demander un accès</a></li>
           <li><a href="https://paypal.me/oufaaizsaad" rel="noopener" target="_blank">Soutenir le projet<span class="sr-only"> (PayPal, nouvel onglet)</span></a></li>
         </ul>
       </nav>
       <nav aria-label="Informations légales">
         <p class="foot-h">Informations</p>
         <ul class="foot-list">
-          <li><a href="/mentions-legales/">Mentions légales</a></li>
-          <li><a href="/confidentialite/">Politique de confidentialité</a></li>
+          <li><a href="/mentions-legales">Mentions légales</a></li>
+          <li><a href="/confidentialite">Politique de confidentialité</a></li>
         </ul>
       </nav>
     </div>
