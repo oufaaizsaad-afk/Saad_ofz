@@ -805,6 +805,10 @@ table.tbl tr.picked td { background: var(--c-accent-soft); }
 .guide-ul { margin: 8px 0 0; padding-left: 18px; color: var(--c-text-2); }
 .guide-ul li { margin: 3px 0; }
 .guide-banner { align-items: center; }
+.demo-banner { align-items: center; flex-wrap: wrap; }
+.demo-banner > div:first-of-type { min-width: 220px; }
+.crm-next { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.crm-next .tag { white-space: normal; max-width: 100%; text-align: left; border-radius: 12px; padding: 3px 9px; }
 .guide-banner a { color: var(--c-accent); font-weight: 600; }
 
 /* Petits écrans : rien ne déborde */
@@ -2983,14 +2987,19 @@ const Dpe = (() => {
   }
 
   /** Consommation et prix implicite de l'énergie (hypothèses économiques). */
-  function energyBaseline(recs) {
+  function energyBaseline(recs, p) {
     const sms = (recs || []).map(r => summary(r.data));
     const allEp = sms.every(s => s.hasEp);
-    const conso = Core.round(Core.sum(sms, s => (s.hasEp ? s.ef : s.ep) || 0), 0);
-    const cost = Core.round(Core.sum(sms, s => s.cost || 0), 2);
+    let conso = Core.round(Core.sum(sms, s => (s.hasEp ? s.ef : s.ep) || 0), 0);
+    let cost = Core.round(Core.sum(sms, s => s.cost || 0), 2);
+    // Quelques DPE représentatifs (échantillon) : on rapporte les consommations à la surface habitable de tout le projet.
+    const sample = Core.sum(sms, s => s.surface || 0);
+    const total = p ? Core.parseNum(p.livingArea) : 0;
+    const scale = sample > 0 && total > sample * 1.05 ? Math.min(total / sample, 60) : 1;
+    if (scale > 1) { conso = Core.round(conso * scale, 0); cost = Core.round(cost * scale, 2); }
     return {
-      conso, cost,
-      kind: allEp ? "énergie finale" : "valeur « conso_5_usages » du fichier",
+      conso, cost, scale, sample, total,
+      kind: (allEp ? "énergie finale" : "valeur « conso_5_usages » du fichier") + (scale > 1 ? ", extrapolée de l'échantillon (" + Core.num(sample, 0) + " m²) à " + Core.num(total, 0) + " m²" : ""),
       price: conso > 0 && cost > 0 ? Core.round(cost / conso, 4) : 0,
     };
   }
@@ -5547,6 +5556,14 @@ const App = (() => {
       const r = CatalogExt.applyPack();
       if (r && (r.added || r.fixed)) setTimeout(() => UI.toast(`Catalogue commun enrichi : ${r.added} postes ajoutés, ${r.fixed} taux de TVA mis à jour.`, "ok", 6000), 900);
     }
+    // Projet d'exemple : une seule fois par compte (nouveaux comptes et comptes existants), jamais avant d'avoir lu l'espace en ligne.
+    const seedDemo = () => Demo.ensure().then(created => {
+      if (!created) return;
+      render();
+      UI.toast("Un projet d'exemple complet a été ajouté à vos projets : parcourez-le, modifiez-le ou supprimez-le.", "ok", 8000);
+    }).catch(e => console.warn("Projet d'exemple", e));
+    seedDemo();
+    Core.Bus.on("repo:synced", ev => { if (ev && ev.online) seedDemo(); });
     Hero.fetchSetting();
     { const before = JSON.stringify(Don.get()); Don.fetchSetting().then(c => { if (JSON.stringify(c) !== before) render(); }); }
     // Photo d'accueil (Paramètres → Page d'accueil)
@@ -6036,7 +6053,8 @@ Views.Projects = (() => {
   }
 
   function actions() {
-    return `<button class="btn btn-primary" data-act="prjNew">${icon("plus", 15)} Nouveau projet</button>`;
+    return `${Demo.exists() ? "" : `<button class="btn" data-act="demoCreate">${icon("star", 15)} Ajouter le projet d'exemple</button>`}
+      <button class="btn btn-primary" data-act="prjNew">${icon("plus", 15)} Nouveau projet</button>`;
   }
 
   function render() {
@@ -6087,7 +6105,7 @@ Views.Projects = (() => {
           <span class="strong">${esc(p.name)}</span></button>
         <div class="xsmall muted-3">${esc(p.coproName || "—")}${p.reference ? " · " + esc(p.reference) : ""}
           <span class="tag" style="margin-left:4px">${esc(p.version)}</span>
-          ${ShareUI.badge(p)}
+          ${Demo.tag(p)}${ShareUI.badge(p)}
           ${p.status === "archivé" ? `<span class="tag warn">Archivé</span>` : ""}
           ${nbScn ? `<span class="tag accent">${nbScn} scénario${nbScn > 1 ? "s" : ""}</span>` : ""}
           ${(p.dpes || []).length ? `<span class="tag ember">${p.dpes.length} DPE</span>` : ""}
@@ -6128,6 +6146,10 @@ Views.Projects = (() => {
       aids: (s.aids || []).map(a => Object.assign({}, a, { id: Core.uid("aid") })),
     }));
     c.dpes = (c.dpes || []).map(r => Object.assign({}, r, { id: Core.uid("dpe"), buildingId: r.buildingId ? (map[r.buildingId] || null) : null }));
+    // Les lots suivent les bâtiments copiés (sinon la répartition par bâtiment du reste à charge serait perdue).
+    c.lots = (c.lots || []).map(l => Object.assign({}, l, { buildingId: l.buildingId ? (map[l.buildingId] || "") : "" }));
+    // Une copie n'est jamais « le projet d'exemple » : elle ne porte ni le badge ni la protection contre la recréation.
+    delete c.demo; delete c.demoVersion;
   }
 
   /* ------------------------------------------------------ Formulaire projet */
@@ -6291,6 +6313,12 @@ Views.Projects = (() => {
       const copy = await Repo.projects.duplicate(d.id, c => {
         c.name = src.name + " (copie)"; c.version = "V1"; c.parentId = null; c.createdBy = Auth.name();
         remapCopy(c);
+        if (src.demo) {
+          c.name = (src.coproName || "Ma copropriété") + " (ma copie)"; c.reference = "";
+          c.comment = "Copie du projet d'exemple : remplacez les données fictives (lots, DPE, quantités, prix, devis) par celles de votre dossier.";
+          c.commercial = { status: "prospect", clientId: "", feeMode: "forfait", feeValue: 0, quoteDate: "", decisionDate: "", notes: "" };
+          c.journal = [];
+        }
       });
       await Repo.flush();
       UI.toast("Projet dupliqué.", "ok");
@@ -6305,9 +6333,16 @@ Views.Projects = (() => {
       App.render();
     },
     prjDel: async d => {
-      if (!Auth.require("projectWrite")) return;
       const p = Repo.projects.get(d.id);
-      const ok = await UI.confirm({
+      if (!p) return;
+      // Le projet d'exemple appartient à l'espace de chacun : tous les rôles peuvent le supprimer.
+      if (!p.demo && !Auth.require("projectWrite")) return;
+      const ok = await UI.confirm(p.demo ? {
+        title: "Supprimer le projet d'exemple ?",
+        message: `« ${p.name} » sera retiré de votre espace, avec le client et les tâches d'exemple.`,
+        detail: "Il ne reviendra pas tout seul. Vous pourrez le recréer à tout moment depuis Projets → « Ajouter le projet d'exemple ».",
+        confirmLabel: "Supprimer l'exemple", danger: true,
+      } : {
         title: "Supprimer ce projet ?",
         message: `« ${p.name} » (${p.version}) et l'ensemble de ses scénarios seront supprimés.`,
         detail: "Cette action est définitive. Pour conserver le dossier sans l'afficher, préférez l'archivage.",
@@ -6315,8 +6350,9 @@ Views.Projects = (() => {
       });
       if (!ok) return;
       await Repo.projects.remove(d.id);
+      if (p.demo) await Demo.afterRemove();
       await Repo.flush();
-      UI.toast("Projet supprimé.", "ok");
+      UI.toast(p.demo ? "Projet d'exemple supprimé. Vous pouvez le recréer depuis la liste des projets." : "Projet supprimé.", "ok");
       if (App.state.projectId === d.id) App.go("projects");
       else App.render();
     },
@@ -6386,7 +6422,7 @@ Views.Project = (() => {
     const cur = tab();
     return `
     <div class="stack">
-      ${ShareUI.banner(p)}
+      ${Demo.banner(p)}${ShareUI.banner(p)}
       <div class="tabs">
         ${[...TABS, ...Ext.tabs().map(x => [x.key, x.label, x.icon])].map(([k, l, ic]) => `<button class="tab ${cur === k ? "active" : ""}" data-act="pTab" data-tab="${k}">
           ${icon(ic, 15)} ${esc(l)}${k === "dpe" && (p.dpes || []).length ? `<span class="cnt">${p.dpes.length}</span>` : ""}</button>`).join("")}
@@ -8506,7 +8542,7 @@ Views.Dpe = (() => {
 
   /* ------------------------------------------------- Hypothèses énergie */
   function ecoDialog(p) {
-    const b = Dpe.energyBaseline(p.dpes);
+    const b = Dpe.energyBaseline(p.dpes, p);
     const e = p.economics || Schema.economics();
     const m = UI.modal({
       title: "Hypothèses énergétiques depuis les DPE", sub: p.name,
@@ -9124,13 +9160,15 @@ Views.Dashboard = (() => {
 
   function render() {
     const refs = { coefficients: Repo.coefficients.all() };
-    const projects = Repo.projects.list(p => p.status !== "archivé");
-    const archived = Repo.projects.all().length - projects.length;
+    const active = Repo.projects.list(p => p.status !== "archivé");
+    const projects = active.filter(p => !p.demo);       // le projet d'exemple n'est pas compté dans les statistiques
+    const hasDemo = active.some(p => p.demo);
+    const archived = Repo.projects.all().filter(p => p.status === "archivé").length;
     const totals = projects.map(p => ({ p, t: Calc.projectTotals(p, refs) })).filter(x => x.t);
     const grand = Core.sum(totals, x => x.t.totalTTC);
     const grandRemainder = Core.sum(totals, x => x.t.remainder);
     const dwellings = Core.sum(projects, p => Core.parseNum(p.nbDwellings));
-    const recent = projects.slice().sort((a, b) => Core.cmp(b.updatedAt, a.updatedAt)).slice(0, 6);
+    const recent = active.slice().sort((a, b) => Core.cmp(b.updatedAt, a.updatedAt)).slice(0, 6);
     const items = Repo.items.list(i => i.active !== false);
     const s = Repo.settings.get();
     const dpeInProjects = Core.sum(projects, p => (p.dpes || []).length);
@@ -9153,6 +9191,7 @@ Views.Dashboard = (() => {
         ${Frag.stat("DPE analysés", String(dpeInProjects + dpeInbox), dpeInbox ? dpeInbox + " en attente dans l'espace d'analyse" : "tous rattachés à un projet")}
         ${Frag.stat("Postes au catalogue", String(items.length), Repo.categories.list(c => c.active !== false).length + " catégories")}
       </div>
+      ${hasDemo ? `<p class="xsmall muted-3" style="margin:-6px 0 0">${icon("info", 12)} Le projet d'exemple n'est pas compté dans ces chiffres.</p>` : ""}
 
       <div class="grid-2">
         <div class="card">
@@ -12338,7 +12377,7 @@ const Perf = (() => {
         chE, ecsE, uWall: 2.0, uRoof: 2.0, uFloor: 1.5, uWin: 3.0,
         areas: { facadeArea: Calc.feeAreaBasis(p, "facadeArea"), roofArea: Calc.feeAreaBasis(p, "roofArea"),
           lowFloorArea: Calc.feeAreaBasis(p, "lowFloorArea"), glazingArea: Calc.feeAreaBasis(p, "glazingArea") },
-        epFile: epM2, gesFile: parseNum(mb.gesM2) || null, clsFile: null, count: 0,
+        epFile: epM2, gesFile: parseNum(mb.gesM2) || null, clsFile: null, count: 0, total: surface, scale: 1,
       };
     }
     const sum = f => recs.reduce((a, r) => a + (f(r) || 0), 0);
@@ -12378,6 +12417,8 @@ const Perf = (() => {
         lowFloorArea: Calc.feeAreaBasis(p, "lowFloorArea") || m.lowFloorArea, glazingArea: Calc.feeAreaBasis(p, "glazingArea") || m.glazingArea,
       },
       epFile, gesFile, clsFile: sm.length === 1 ? sm[0].cls : null, count: recs.length,
+      // Échantillon : les ratios (étiquette, gain en %) restent ceux de l'échantillon ; les montants absolus sont rapportés à la surface totale.
+      total: parseNum(p.livingArea), scale: surface > 0 && parseNum(p.livingArea) > surface * 1.05 ? Math.min(parseNum(p.livingArea) / surface, 60) : 1,
     };
   }
 
@@ -12534,7 +12575,7 @@ const Perf = (() => {
       return { byE, ef, ep, ges, cost };
     };
     const before = tally({ [b.chE]: b.consoCh }, b.consoEcs, b.ecsE, b.other, 0);
-    const after = tally(ch1, ecs1, ecsE1, b.other, pvKwh);
+    const after = tally(ch1, ecs1, ecsE1, b.other, pvKwh / (b.scale || 1));   // le photovoltaïque est chiffré pour tout l'immeuble
     const S = b.surface || 1;
     const cls = (ep, ges) => {
       const i = Math.max(idx(ep, Dpe.EP_T), idx(ges, Dpe.GES_T));
@@ -12550,9 +12591,12 @@ const Perf = (() => {
     res.gainEP = before.ep > 0 ? 1 - after.ep / before.ep : 0;
     res.gainEF = before.ef > 0 ? 1 - after.ef / before.ef : 0;
     res.gainGES = before.ges > 0 ? 1 - after.ges / before.ges : 0;
-    res.savedKwh = before.ef - after.ef;
+    const sc = b.scale || 1;
+    res.scale = sc;
+    res.efBefore = before.ef * sc; res.efAfter = after.ef * sc; res.gesSaved = (before.ges - after.ges) * sc;
+    res.savedKwh = (before.ef - after.ef) * sc;
     const price = parseNum((p.economics || {}).energyPrice);
-    res.savedEur = price > 0 ? res.savedKwh * price : before.cost - after.cost;
+    res.savedEur = price > 0 ? res.savedKwh * price : (before.cost - after.cost) * sc;
     return res;
   }
   const idx = (v, T) => { if (v === null || v === undefined || !isFinite(v)) return -1; for (let i = 0; i < T.length; i++) if (v <= T[i]) return i; return 6; };
@@ -12643,7 +12687,7 @@ const Perf = (() => {
     if (!s) return Frag.empty("Aucun scénario", "Créez un scénario et ajoutez des postes pour estimer la performance après travaux.");
     const b = baseline(p);
     const head = `<div class="card"><div class="card-body row between">${Ext.scenarioSelect(p, s)}
-      <span class="small muted-3">${b ? (b.manual ? "État initial saisi à la main" : b.count + " DPE rattaché(s) · " + num(b.surface, 0) + " m²") : "État initial à renseigner"}</span></div></div>`;
+      <span class="small muted-3">${b ? (b.manual ? "État initial saisi à la main" : b.count + " DPE rattaché(s) · " + num(b.surface, 0) + " m²" + (b.scale > 1 ? " (échantillon, extrapolé à " + num(b.total, 0) + " m²)" : "")) : "État initial à renseigner"}</span></div></div>`;
     if (!b) return head + manualCard(p, ro);
     const e = estimate(p, s);
     const cee = ceeFor(p, s);
@@ -12675,12 +12719,12 @@ const Perf = (() => {
         <div class="stat-grid" style="margin-top:14px">
           ${Frag.stat("Gain énergie finale", pct(e.gainEF), num(e.savedKwh, 0) + " kWh/an économisés", "accent")}
           ${Frag.stat("Économie annuelle", e.savedEur > 0 ? eur(e.savedEur) : "—", "aux prix de l'énergie " + ((p.economics || {}).energyPrice ? "du projet" : "moyens 2026"))}
-          ${Frag.stat("Émissions de CO₂", pct(e.gainGES), num((e.before.ges - e.after.ges) / 1000, 1) + " t CO₂/an évitées", "ember")}
+          ${Frag.stat("Émissions de CO₂", pct(e.gainGES), num(e.gesSaved / 1000, 1) + " t CO₂/an évitées", "ember")}
           ${Frag.stat("Chauffage après", e.gen ? esc(e.gen.label) : "inchangé", esc(ENERGY_LABEL[e.chE1] || ""))}
         </div>
         <div class="row between" style="margin-top:12px">
           <p class="xsmall muted-3" style="margin:0;max-width:760px">Estimation simplifiée (déperditions du DPE réduites selon les travaux, rendements types des équipements, coefficient
-            d'énergie primaire de l'électricité 1,9 en vigueur depuis 2026). Elle ne remplace ni un calcul 3CL ni l'audit énergétique réglementaire.</p>
+            d'énergie primaire de l'électricité 1,9 en vigueur depuis 2026). Elle ne remplace ni un calcul 3CL ni l'audit énergétique réglementaire.${e.b.scale > 1 ? " Les DPE rattachés forment un échantillon (" + e.b.count + " DPE, " + num(e.b.surface, 0) + " m²) : les économies annuelles et les émissions évitées sont rapportées à la surface habitable du projet (" + num(e.b.total, 0) + " m²) ; l'étiquette et le gain en % restent ceux de l'échantillon." : ""}</p>
           ${ro ? "" : `<button class="btn" data-act="perfApply" data-sid="${esc(s.id)}" data-gain="${round(e.gainEF * 100, 1)}">${icon("chart", 15)} Reporter ${num(e.gainEF * 100, 0)} % dans l'analyse économique</button>`}
         </div>
       </div></div>
@@ -12761,7 +12805,7 @@ const Perf = (() => {
       const p = Ext.P(); if (!p || !Ext.guard(p)) return;
       const s = (p.scenarios || []).find(x => x.id === d.sid); if (!s) return;
       s.energySavingPct = parseNum(d.gain);
-      const base = Dpe.energyBaseline(p.dpes || []);
+      const base = Dpe.energyBaseline(p.dpes || [], p);
       p.economics = p.economics || Schema.economics();
       if (!parseNum(p.economics.consoBefore) && base.conso) p.economics.consoBefore = base.conso;
       if (!parseNum(p.economics.energyPrice) && base.price) p.economics.energyPrice = base.price;
@@ -13548,7 +13592,7 @@ const CRM = (() => {
         <tbody>${list.map(c => {
           const ps = projs.filter(p => com(p).clientId === c.id);
           const signed = ps.filter(p => ["accepte", "encours", "termine"].includes(com(p).status)).reduce((a, p) => a + feeHT(p), 0);
-          return `<tr><td><div class="strong">${esc(c.name)}</div>${c.address ? `<div class="xsmall muted-3">${esc(c.address)}</div>` : ""}</td>
+          return `<tr><td><div class="strong">${esc(c.name)}${c.demo ? ` <span class="tag ember">EXEMPLE</span>` : ""}</div>${c.address ? `<div class="xsmall muted-3">${esc(c.address)}</div>` : ""}</td>
             <td><span class="tag">${esc(c.type || "—")}</span></td>
             <td class="small">${esc(c.contact || "")}${c.email ? `<br><a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : ""}${c.phone ? `<br><a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ""}</td>
             <td class="num r">${ps.length ? ps.map(p => `<button class="btn btn-ghost btn-sm" data-act="prjOpen" data-id="${esc(p.id)}" title="${esc(p.name)}">${esc(p.reference || p.name).slice(0, 18)}</button>`).join(" ") : "0"}</td>
@@ -13563,12 +13607,12 @@ const CRM = (() => {
     const projs = Repo.projects.list(p => p.status !== "archivé");
     return `<div class="crm-board">${STATUS.map(([k, label, color]) => {
       const ps = projs.filter(p => com(p).status === k);
-      const tot = ps.reduce((a, p) => a + feeHT(p), 0);
+      const tot = ps.filter(p => !p.demo).reduce((a, p) => a + feeHT(p), 0);
       return `<div class="crm-col"><div class="crm-col-head" style="border-top-color:${color}"><strong>${esc(label)}</strong>
           <span class="xsmall muted">${ps.length} · ${eur(tot)} HT</span></div>
         ${ps.map(p => { const c = com(p); const t = Calc.projectTotals(p, Ext.refs());
           return `<div class="crm-card">
-            <button class="btn btn-ghost" style="padding:0;text-align:left" data-act="prjOpen" data-id="${esc(p.id)}"><span class="strong">${esc(p.name)}</span></button>
+            <button class="btn btn-ghost" style="padding:0;text-align:left" data-act="prjOpen" data-id="${esc(p.id)}"><span class="strong">${esc(p.name)}</span></button> ${Demo.tag(p)}
             <div class="xsmall muted-3">${esc(clientName(c.clientId) || p.coproName || "—")}</div>
             <div class="row between small" style="margin-top:6px"><span>Honoraires</span><strong class="mono">${eur(feeHT(p))}</strong></div>
             ${t ? `<div class="row between xsmall muted"><span>Travaux</span><span class="mono">${eur(t.totalTTC)} TTC</span></div>` : ""}
@@ -13581,7 +13625,7 @@ const CRM = (() => {
   }
 
   function stats() {
-    const projs = Repo.projects.list(p => p.status !== "archivé");
+    const projs = Repo.projects.list(p => p.status !== "archivé" && !p.demo);
     const by = k => projs.filter(p => com(p).status === k);
     const sum = arr => arr.reduce((a, p) => a + feeHT(p), 0);
     const sent = by("devis"), won = [...by("accepte"), ...by("encours"), ...by("termine")], lost = by("perdu");
@@ -13628,11 +13672,11 @@ const CRM = (() => {
   /* ============================================================= Tâches */
   const todayStr = () => Ext.today();
   function taskRow(t) {
-    const late = !t.done && t.due && t.due < todayStr();
+    const late = !t.done && !t.demo && t.due && t.due < todayStr();
     const p = t.projectId ? Repo.projects.get(t.projectId) : null;
     return `<tr class="${t.done ? "inactive" : ""}">
       <td class="c" style="width:40px"><input type="checkbox" data-chg="tkDone" data-id="${esc(t.id)}" ${t.done ? "checked" : ""} aria-label="Fait"></td>
-      <td><div class="strong">${esc(t.title)}</div>${t.notes ? `<div class="xsmall muted-3">${esc(t.notes)}</div>` : ""}</td>
+      <td><div class="strong">${esc(t.title)}${t.demo ? ` <span class="tag ember">EXEMPLE</span>` : ""}</div>${t.notes ? `<div class="xsmall muted-3">${esc(t.notes)}</div>` : ""}</td>
       <td><span class="tag">${esc(t.type || "Autre")}</span></td>
       <td class="small nowrap ${late ? "tk-late" : ""}">${t.due ? dateFR(t.due) + (t.time ? " " + esc(t.time) : "") : "—"}${late ? " · en retard" : ""}</td>
       <td class="small">${p ? `<button class="btn btn-ghost btn-sm" data-act="prjOpen" data-id="${esc(p.id)}">${esc(p.name)}</button>` : t.clientId ? esc(clientName(t.clientId)) : "—"}</td>
@@ -13644,11 +13688,11 @@ const CRM = (() => {
     const d = todayStr();
     let l = tasks().filter(t => !projectId || t.projectId === projectId);
     if (mode === "avenir") l = l.filter(t => !t.done);
-    else if (mode === "retard") l = l.filter(t => !t.done && t.due && t.due < d);
+    else if (mode === "retard") l = l.filter(t => !t.done && !t.demo && t.due && t.due < d);
     else if (mode === "faites") l = l.filter(t => t.done);
     return l.sort((a, b) => Core.cmp(a.due || "9999", b.due || "9999"));
   }
-  const overdue = () => tasks().filter(t => !t.done && t.due && t.due < todayStr()).length;
+  const overdue = () => tasks().filter(t => !t.done && !t.demo && t.due && t.due < todayStr()).length;
 
   const TasksView = {
     actions: () => `<button class="btn" data-act="tkIcsAll">${icon("calendar", 15)} Exporter vers mon agenda</button>
@@ -13740,14 +13784,14 @@ const CRM = (() => {
         ${ro ? "" : `<div class="row between"><div class="btn-group"><button class="btn" data-act="crmSaveCom">${icon("check", 15)} Enregistrer</button>
           <button class="btn" data-act="crmQuickClient">${icon("plus", 15)} Nouveau client</button></div>
           <button class="btn" data-act="tkNewFor" data-pid="${esc(p.id)}">${icon("calendar", 15)} Ajouter une tâche</button></div>`}
-        ${pt.length ? `<div class="small"><strong>Tâches à venir :</strong> ${pt.slice(0, 4).map(t => `<span class="tag ${t.due && t.due < todayStr() ? "danger" : ""}">${t.due ? dateFR(t.due) + " · " : ""}${esc(t.title)}</span>`).join(" ")}</div>` : ""}
+        ${pt.length ? `<div class="small"><strong>Tâches à venir :</strong><div class="crm-next">${pt.slice(0, 4).map(t => `<span class="tag ${t.due && t.due < todayStr() ? "danger" : ""}">${t.due ? dateFR(t.due) + " · " : ""}${esc(t.title)}</span>`).join("")}</div></div>` : ""}
       </div></div>`;
   }
   function dashboardCard() {
     const d = todayStr();
     const soon = new Date(); soon.setDate(soon.getDate() + 7);
     const s = soon.toISOString().slice(0, 10);
-    const list = tasks().filter(t => !t.done && t.due && t.due <= s).sort((a, b) => Core.cmp(a.due, b.due)).slice(0, 6);
+    const list = tasks().filter(t => !t.done && !t.demo && t.due && t.due <= s).sort((a, b) => Core.cmp(a.due, b.due)).slice(0, 6);
     if (!list.length) return "";
     return `<div class="card"><div class="card-head"><h3>À faire cette semaine</h3>
       <button class="btn btn-sm spacer" data-act="go" data-route="taches">Toutes les tâches</button></div>
@@ -14045,7 +14089,7 @@ const Livrables = (() => {
         ["Étiquette énergie", cur.e.before.cls || "—", cur.e.after.cls || "—"],
         ["Énergie primaire (kWhEP/m².an)", num(cur.e.before.epM2, 0), num(cur.e.after.epM2, 0)],
         ["Émissions (kgCO₂/m².an)", num(cur.e.before.gesM2, 1), num(cur.e.after.gesM2, 1)],
-        ["Énergie finale (kWh/an)", num(cur.e.before.ef, 0), num(cur.e.after.ef, 0)],
+        ["Énergie finale (kWh/an)", num(cur.e.efBefore, 0), num(cur.e.efAfter, 0)],
       ], [1, 2]));
       out.push(k.P("Estimation simplifiée du bureau d'études (coefficient d'énergie primaire de l'électricité : 1,9). Elle ne remplace pas l'audit énergétique réglementaire.", { italic: true, color: "7E8C99", size: 18 }));
     }
@@ -14179,7 +14223,7 @@ const Livrables = (() => {
       clsBox(e.before.cls, M, 50, 40); doc.setFontSize(30); doc.setTextColor(...Reporting.ACCENT); doc.text(">", M + 50, 78);
       clsBox(e.after.cls, M + 66, 50, 40);
       big("Économie d'énergie", "-" + num(e.gainEP * 100, 0) + " %", 150, 56, Reporting.ACCENT);
-      big("CO2 évité", num((e.before.ges - e.after.ges) / 1000, 1) + " t / an", 150, 84);
+      big("CO2 évité", num(e.gesSaved / 1000, 1) + " t / an", 150, 84);
       if (e.savedEur > 0) big("Économie sur les factures", Reporting.money(e.savedEur) + " / an", 150, 112);
       doc.setFont("helvetica", "italic"); doc.setFontSize(8.5); doc.setTextColor(...Reporting.MUTED);
       doc.text("Estimation du bureau d'études, à confirmer par l'audit énergétique réglementaire.", M, H - 18);
@@ -14467,6 +14511,7 @@ const ShareUI = (() => {
 
   async function dialog() {
     const p = Ext.P(); if (!p) return;
+    if (p.demo) return UI.toast("Le projet d'exemple ne se partage pas : dupliquez-le, puis partagez votre copie.", "warn", 6000);
     if (!Repo.isOnline()) return UI.toast("Connexion internet nécessaire pour partager un projet.", "warn");
     let info = Repo.sharedInfo(p.id);
     let cols = [];
@@ -14807,15 +14852,557 @@ const SettingsExt = (() => {
 
 
 /* ------------------------------------------------------------------------
+ * Projet d'exemple : une copropriété fictive, complète, ajoutée une seule fois
+ * à l'espace privé de chaque compte (nouveaux, futurs et anciens comptes).
+ * Chaque compte reçoit SA copie : elle est modifiable, supprimable et recréable.
+ * Tous les chiffres dérivés (gains, CEE, aides, devis) sont calculés par les
+ * moteurs de l'application à partir des données ci-dessous.
+ * ---------------------------------------------------------------------- */
+const Demo = (() => {
+  "use strict";
+  const { esc, parseNum, round } = Core;
+  const icon = UI.icon;
+
+  const ID = "prj_exemple", V = 1;
+  const KEY_ID = "key_exemple_chauffage";
+  const CLIENTS = ["cli_exemple_syndic", "cli_exemple_cs"];
+  const TASKS = ["tsk_exemple_1", "tsk_exemple_2", "tsk_exemple_3", "tsk_exemple_4"];
+  const FIRST = { lat: 45.7712, lon: 4.8850 };
+
+  
+const DPE_LETTERS = ["A", "B", "C", "D", "E", "F", "G"];
+const DPE_EP_T = [70, 110, 180, 250, 330, 420];
+const DPE_GES_T = [6, 11, 30, 50, 70, 100];
+const dpeIdx = (v, T) => { for (let i = 0; i < T.length; i++) if (v <= T[i]) return i; return 6; };
+const r1 = v => Math.round(v * 10) / 10;
+const r0 = v => Math.round(v);
+
+/**
+ * a = { S, rdc, top, pignon, nbLog… } → enregistrement `data` d'un DPE (admin, logKV, sortie, parois, systèmes).
+ * Hypothèses : béton banché de 20 cm non isolé, double vitrage bois d'origine, toiture-terrasse peu isolée,
+ * plancher bas sur parking, chaudière collective gaz des années 1990, ECS collective bouclée.
+ */
+function dpeModel(a) {
+  const S = a.S;
+  // --- Parois -------------------------------------------------------------
+  const width = S / 10.2;                                        // largeur du logement (profondeur d'immeuble 12 m)
+  const grossWall = 2 * width * 2.6 + (a.pignon ? 26 : 0);       // façades avant/arrière (+ pignon)
+  const Ab = r1(0.19 * S * (a.pignon ? 1.08 : 1));               // surface de baies
+  const Am = r1(grossWall - Ab);
+  const U = { mur: a.umur || 2.6, baie: a.ujn || 2.9, ph: a.uph || 0.95, pb: a.upb || 1.0, porte: 3.5 };
+  const dep = {
+    mur: Am * U.mur,
+    baie: Ab * U.baie,
+    ph: a.top ? S * U.ph : 0,
+    pb: a.rdc ? S * U.pb * 0.8 : 0,
+    porte: 4.2,
+  };
+  const ponts = [
+    { type_liaison: "plancher intermédiaire / mur", l: r1(2 * width), k: 0.86 },
+    { type_liaison: "refend / mur", l: r1(2 * 2.6 * (a.pignon ? 2 : 1)), k: 0.65 },
+    { type_liaison: "menuiserie / mur", l: r1(Ab / 1.4 * 3.1), k: 0.5 },
+  ];
+  if (a.rdc) ponts.push({ type_liaison: "plancher bas / mur", l: r1(2 * width + (a.pignon ? 10 : 0)), k: 0.95 });
+  if (a.top) ponts.push({ type_liaison: "plancher haut / mur", l: r1(2 * width + (a.pignon ? 10 : 0)), k: 0.7 });
+  dep.pont = ponts.reduce((x, p) => x + p.l * p.k, 0);
+  const hvent = 0.34 * S * 2.5 * 0.55, hperm = 0.34 * S * 2.5 * (a.perm || 0.16);
+  dep.air = hvent + hperm;
+  const H = dep.mur + dep.baie + dep.ph + dep.pb + dep.porte + dep.pont + dep.air;
+  // --- Besoins et consommations -------------------------------------------
+  const besoinCh = H * (a.dh || 41);
+  const effCh = a.effCh || 0.585;                                // génération × distribution × émission × régulation
+  const consoCh = besoinCh / effCh;
+  const nadeq = Math.round((0.75 + 0.022 * S) * 10) / 10;
+  const besoinEcs = 800 * nadeq;
+  const consoEcs = besoinEcs / (a.effEcs || 0.5);                // production collective et bouclage
+  const eclairage = r0(1.9 * S), aux = r0(3.1 * S + 60);         // kWh d'électricité
+  const ef = consoCh + consoEcs + eclairage + aux;
+  const ep = consoCh + consoEcs + (eclairage + aux) * 1.9;
+  const ges = (consoCh + consoEcs) * 0.227 + (eclairage + aux) * 0.064;
+  const epM2 = ep / S, gesM2 = ges / S;
+  const cls = DPE_LETTERS[Math.max(dpeIdx(epM2, DPE_EP_T), dpeIdx(gesM2, DPE_GES_T))];
+  const clsGes = DPE_LETTERS[dpeIdx(gesM2, DPE_GES_T)];
+  const cost = (consoCh + consoEcs) * 0.108 + (eclairage + aux) * 0.21 + 1.0 * S * 0;   // hors abonnement : coût conventionnel
+  const sortie = {
+    deperdition_mur: r1(dep.mur), deperdition_plancher_bas: r1(dep.pb), deperdition_plancher_haut: r1(dep.ph),
+    deperdition_baie_vitree: r1(dep.baie), deperdition_porte: r1(dep.porte), deperdition_pont_thermique: r1(dep.pont),
+    deperdition_renouvellement_air: r1(dep.air), deperdition_enveloppe: r1(H), hperm: r1(hperm), hvent: r1(hvent),
+    besoin_ch: r0(besoinCh), besoin_ecs: r0(besoinEcs), apport_solaire_ch: r0(besoinCh * 0.09), fraction_apport_gratuit_ch: 0.12,
+    conso_ch: r0(consoCh), conso_ecs: r0(consoEcs), conso_eclairage: eclairage, conso_totale_auxiliaire: aux,
+    conso_5_usages: r0(ef), conso_5_usages_m2: r0(ef / S),
+    ep_conso_5_usages: r0(ep), ep_conso_5_usages_m2: r0(epM2),
+    emission_ges_5_usages: r0(ges), emission_ges_5_usages_m2: r0(gesM2),
+    cout_5_usages: r0(cost), cout_ch: r0(consoCh * 0.108), cout_ecs: r0(consoEcs * 0.108),
+    classe_bilan_dpe: cls, classe_emission_ges: clsGes, nadeq, v40_ecs_journalier: r0(nadeq * 50),
+  };
+  const murs = [{ orientation: a.orient || "Sud", type_adjacence: "extérieur", materiaux_structure_mur: "Béton banché", type_isolation: "non isolé",
+      surface_paroi_opaque: r1(Am * 0.55), umur: U.mur, umur0: U.mur, b: 1 },
+    { orientation: a.orient === "Sud" ? "Nord" : "Sud", type_adjacence: "extérieur", materiaux_structure_mur: "Béton banché", type_isolation: "non isolé",
+      surface_paroi_opaque: r1(Am * (a.pignon ? 0.25 : 0.45)), umur: U.mur, umur0: U.mur, b: 1 }];
+  if (a.pignon) murs.push({ orientation: "Ouest", type_adjacence: "extérieur", materiaux_structure_mur: "Béton banché", type_isolation: "non isolé",
+    surface_paroi_opaque: r1(Am * 0.2), umur: U.mur, umur0: U.mur, b: 1 });
+  murs.push({ orientation: "Est", type_adjacence: "circulation commune", materiaux_structure_mur: "Béton banché", type_isolation: "non isolé",
+    surface_paroi_opaque: r1(2.6 * 4.2), umur: 2.5, umur0: 2.5, b: 0.35 });
+  const nbBaies = Math.max(3, Math.round(Ab / 1.65));
+  const baies = [{ reference: "F1", orientation: a.orient || "Sud", type_vitrage: "double vitrage", type_materiaux_menuiserie: "Bois", type_fermeture: "Volets roulants PVC",
+      surface_totale_baie: r1(Ab * 0.6), nb_baie: Math.max(2, Math.round(nbBaies * 0.6)), uw: 3.2, sw: 0.45, ujn: U.baie },
+    { reference: "F2", orientation: a.orient === "Sud" ? "Nord" : "Sud", type_vitrage: "double vitrage", type_materiaux_menuiserie: "Bois", type_fermeture: "Volets roulants PVC",
+      surface_totale_baie: r1(Ab * 0.4), nb_baie: Math.max(1, nbBaies - Math.max(2, Math.round(nbBaies * 0.6))), uw: 3.2, sw: 0.45, ujn: U.baie }];
+  return {
+    logKV: {
+      type_batiment: "appartement", annee_construction: 1974, periode_construction: "1948-1974", methode_application_dpe_log: "dpe appartement individuel",
+      surface_habitable_logement: S, hsp: 2.5, nombre_niveau_logement: 1, zone_climatique: "H1c", altitude: 170, classe_altitude: "inférieur à 400m",
+      classe_inertie: "Lourde", orientation: a.orient || "Sud", type_adjacence: "extérieur",
+      materiaux_structure_mur: "Béton banché", type_isolation: "non isolé", surface_paroi_opaque: r1(Am), umur: U.mur, umur0: U.mur, b: 1,
+      type_plancher_bas: "Dalle béton", upb: 2, upb_final: U.pb, type_plancher_haut: "Toiture-terrasse béton", uph: U.ph,
+      type_vitrage: "double vitrage", type_materiaux_menuiserie: "Bois", type_fermeture: "Volets roulants PVC", surface_totale_baie: Ab, nb_baie: nbBaies,
+      uw: 3.2, sw: 0.45, ujn: U.baie, type_porte: "Porte bois opaque pleine", surface_porte: 2, uporte: U.porte,
+      type_ventilation: "VMC simple flux autoréglable après 1982", surface_ventile: S, q4pa_conv: 2.6, hperm: r1(hperm), hvent: r1(hvent),
+      type_installation: "installation collective", surface_chauffee: S, type_generateur_ch: "Chaudière gaz standard 1991-2000", type_energie: "Gaz naturel",
+      rpn: 0.86, rendement_generation: 0.8, type_emission_distribution: "radiateur monotube sans robinet thermostatique", rendement_emission: 0.9,
+      rendement_distribution: 0.84, type_generateur_ecs: "Production collective par chaudière gaz avec ballon et bouclage", type_stockage_ecs: "stockage collectif",
+      besoin_ecs: r0(besoinEcs),
+    },
+    sortie, murs,
+    pbas: [{ type_adjacence: a.rdc ? "parking (local non chauffé)" : "local chauffé", type_plancher_bas: "Dalle béton", type_isolation: "non isolé",
+      surface_paroi_opaque: S, upb: 2, upb_final: U.pb, b: a.rdc ? 0.8 : 0 }],
+    phauts: [{ type_adjacence: a.top ? "extérieur (toiture-terrasse)" : "local chauffé", type_plancher_haut: "Toiture-terrasse béton avec isolant de 4 cm", type_isolation: a.top ? "isolation faible (4 cm)" : "non concerné",
+      surface_paroi_opaque: S, uph: U.ph, b: a.top ? 1 : 0 }],
+    baies,
+    portes: [{ type_adjacence: "circulation commune", type_porte: "Porte bois opaque pleine", surface_porte: 2, uporte: U.porte }],
+    ponts,
+    vmc: { type_ventilation: "VMC simple flux autoréglable après 1982", surface_ventile: S, q4pa_conv: 2.6, plusieurs_facade_exposee: 1, ventilation_post_2012: 0, hperm: r1(hperm), hvent: r1(hvent) },
+    genECS: { type_generateur_ecs: "Production collective par chaudière gaz avec ballon et bouclage", type_energie: "Gaz naturel", type_installation: "installation collective",
+      type_stockage_ecs: "stockage collectif", besoin_ecs: r0(besoinEcs) },
+    installCH: { type_installation: "installation collective", description: "Chauffage collectif — chaudière gaz en chaufferie" },
+    genCH: { type_generateur_ch: "Chaudière gaz standard 1991-2000", type_energie: "Gaz naturel", pn: 200000, rpn: 0.86, rendement_generation: 0.8 },
+    emetteur: { type_emission_distribution: "radiateur monotube sans robinet thermostatique", rendement_emission: 0.9, rendement_distribution: 0.84 },
+    _calc: { H, epM2, gesM2, cls, dep },
+  };
+}
+
+
+  /* Postes utilisés : valeurs de repli si le poste n'est plus dans le catalogue [catégorie, unité, prix HT, TVA]. */
+  const FALLBACK = {"Bandes coupe-feu en laine de roche (ITE PSE)": ["Façades & Isolation Extérieure", "ml", 30, 5.5], "CESC — Chauffe-eau solaire collectif": ["Eau Chaude Sanitaire (ECS)", "logmt", 1200, 5.5], "Calorifugeage des points singuliers (vannes, brides)": ["Chauffage & Régulation", "unité", 120, 5.5], "Calorifugeage des réseaux (tuyauteries)": ["Chauffage & Régulation", "ml", 35, 5.5], "Calorifugeage du bouclage ECS": ["Eau Chaude Sanitaire (ECS)", "ml", 40, 5.5], "Châssis de cage d'escalier (parties communes)": ["Enveloppe & Menuiseries", "unité", 1400, 10], "Circulateurs à vitesse variable (chaufferie)": ["Chauffage & Régulation", "unité", 1500, 10], "Couvertines et bavettes d'appui": ["Façades & Isolation Extérieure", "ml", 55, 10], "Descentes d'eaux pluviales (remplacement)": ["Façades & Isolation Extérieure", "ml", 45, 10], "Désembouage du réseau de chauffage": ["Chauffage & Régulation", "logmt", 180, 10], "Détecteur de présence (éclairage)": ["Équipements Électriques & Divers", "unité", 120, 10], "ITE complète — R = 3,7 m².K/W (≈15 cm, enduit finition)": ["Façades & Isolation Extérieure", "m²", 260, 5.5], "ITE laine de roche sous enduit — R ≥ 3,7 m².K/W": ["Façades & Isolation Extérieure", "m²", 285, 5.5], "Isolation plafond de sous-sol / parking par flocage — R ≥ 3 m².K/W": ["Façades & Isolation Extérieure", "m²", 45, 5.5], "Isolation sous-face de balcons / loggias": ["Façades & Isolation Extérieure", "m²", 110, 10], "Kit hydro-économe (mousseurs, douchette, régulateurs)": ["Eau Chaude Sanitaire (ECS)", "logmt", 80, 10], "Ligne de vie toiture permanente": ["Toiture & Combles", "ml", 60, 10], "Menuiserie PVC double vitrage — Uw ≤ 1,3 W/m².K et Sw ≥ 0,3 (ou Uw ≤ 1,7 et Sw ≥ 0,36)": ["Enveloppe & Menuiseries", "unité", 950, 5.5], "Mesure des débits / réception VMC (protocole Promevent)": ["Ventilation", "logmt", 60, 20], "Nettoyage des réseaux de ventilation": ["Ventilation", "logmt", 90, 10], "PAC air/eau collective (copropriété)": ["Chauffage & Régulation", "unité", 65000, 5.5], "PV en autoconsommation collective (> 9 kWc)": ["Énergies Renouvelables", "kWc", 1600, 20], "Porte d'entrée immeuble (remplacement)": ["Enveloppe & Menuiseries", "unité", 3000, 10], "Pot à boues / filtre magnétique (chaufferie)": ["Chauffage & Régulation", "unité", 1800, 10], "Pré-équipement IRVE (infrastructure collective)": ["Équipements Électriques & Divers", "place", 1000, 10], "Raccordement Enedis / compteur de production": ["Énergies Renouvelables", "forfait", 3000, 20], "Relevés d'étanchéité / acrotères": ["Toiture & Combles", "ml", 85, 10], "Retours d'isolant en tableaux, voussures et appuis": ["Façades & Isolation Extérieure", "ml", 35, 5.5], "Robinets thermostatiques": ["Chauffage & Régulation", "unité", 89, 5.5], "Rupteurs / traitement des ponts thermiques de liaison (nez de dalle, balcons)": ["Façades & Isolation Extérieure", "ml", 140, 10], "Régulation de chaufferie (sonde extérieure, loi d'eau)": ["Chauffage & Régulation", "unité", 3500, 5.5], "Répartiteurs de frais de chauffage (par radiateur)": ["Chauffage & Régulation", "unité", 80, 5.5], "VMC simple flux hygro B": ["Ventilation", "logmt", 1700, 5.5], "Échafaudage de façade (montage, location 3 mois, démontage)": ["Façades & Isolation Extérieure", "m²", 18, 10], "Éclairage LED parties communes": ["Équipements Électriques & Divers", "unité", 80, 10], "Équilibrage hydraulique réseau": ["Chauffage & Régulation", "logmt", 150, 5.5], "Étanchéité toit-terrasse + isolation PIR — R = 4,5 m².K/W": ["Toiture & Combles", "m²", 200, 5.5]};
+
+  /* ------------------------------------------------------------ Outils */
+  const DAY = 864e5;
+  const isoIn = d => new Date(Date.now() + d * DAY).toISOString().slice(0, 10);
+  const stampAgo = (d, h, m) => { const t = new Date(Date.now() - d * DAY); t.setHours(h, m || 0, 0, 0); return t.toISOString(); };
+  const mondayIn = d => { const t = new Date(Date.now() + d * DAY); t.setDate(t.getDate() + ((8 - t.getDay()) % 7)); return t.toISOString().slice(0, 10); };
+  const norm = s => Core.norm(s || "");
+  const roundTo = (v, step) => Math.round(v / step) * step;
+
+  /** Répartit `total` entre des poids (méthode du plus fort reste) : la somme est exacte. */
+  function spreadInt(total, weights) {
+    const W = weights.reduce((a, b) => a + b, 0);
+    const raw = weights.map(w => w * total / W), fl = raw.map(Math.floor);
+    let rest = total - fl.reduce((a, b) => a + b, 0);
+    raw.map((v, i) => [v - fl[i], i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (rest > 0) { fl[i]++; rest--; } });
+    return fl;
+  }
+
+  /* ---------------------------------------------------- Lots et bâtiments */
+  const SURF = { A: [46, 62, 66, 82, 48], B: [45, 61, 64, 80, 47] };
+  const SURNAMES = ["Martin", "Bernard", "Dubois", "Thomas", "Robert", "Richard", "Petit", "Durand", "Leroy", "Moreau", "Simon", "Laurent",
+    "Lefebvre", "Michel", "Garcia", "David", "Bertrand", "Roux", "Vincent", "Fournier", "Morel", "Girard", "André", "Mercier", "Dupont",
+    "Lambert", "Bonnet", "François", "Martinez", "Legrand", "Garnier", "Faure", "Rousseau", "Blanc", "Guérin", "Muller", "Henry", "Roussel",
+    "Nicolas", "Perrin", "Morin", "Mathieu", "Clément", "Gauthier", "Dumont", "Lopez", "Fontaine", "Chevalier"];
+  const CIVIL = ["M.", "Mme", "M. et Mme", "Mme", "M.", "M. et Mme"];
+  const SCI = ["Horizon", "Les Acacias", "Belle Vue", "Ambre", "Cèdre", "Étoile", "Lumière", "Rivage", "Mistral", "Azur", "Sérénité", "Aurore"];
+  const CATS = ["tm", "m", "i", "s"];
+
+  function lotPlan() {
+    const out = []; let n = 0;
+    ["A", "B"].forEach(bt => {
+      for (let f = 0; f < 5; f++) for (let pos = 0; pos < (f === 4 ? 4 : 5); pos++) { n++; out.push({ n, bt, f, pos, S: SURF[bt][pos], pignon: pos === 0 || pos === 4 }); }
+    });
+    return out;
+  }
+
+  /* ----------------------------------------------------------- Catalogue */
+  const catByName = name => Repo.categories.all().find(c => c.name === name) || null;
+  const coefId = part => { const c = Repo.coefficients.all().find(x => norm(x.label).includes(norm(part))); return c ? c.id : null; };
+  function mkLine(label, qty, o) {
+    o = o || {};
+    const fb = FALLBACK[label] || ["", "u", 0, 10];
+    const it = Repo.items.all().find(i => i.label === label && i.active !== false) || Repo.items.all().find(i => norm(i.label) === norm(label));
+    const cat = it ? it.categoryId : (catByName(fb[0]) || {}).id || null;
+    const price = it ? parseNum(it.priceHT) : fb[2];
+    const vat = it ? parseNum(it.vatRate) : fb[3];
+    return Schema.line({
+      catalogItemId: it ? it.id : null, label, categoryId: cat, unit: it ? it.unit : fb[1], priceHT: price, vatRate: vat, catalogPriceHT: price,
+      quantity: qty, quantityOrigin: o.formula ? "calcul" : "saisie", quantityFormula: o.formula || "",
+      coefficientIds: (o.coef || []).map(coefId).filter(Boolean), buildingIds: o.b || [], comment: o.comment || "",
+    });
+  }
+
+  /* --------------------------------------------------------------- Création */
+  function build() {
+    const user = Auth.name() || "Chargé d'étude";
+    const me = "Chargé d'étude (exemple)";      // auteur affiché dans le journal, la visite et les métrés
+    const now = Core.nowIso();
+    const plan = lotPlan();
+
+    // Lots : tantièmes généraux et millièmes de chauffage (sommes exactes à 10 000)
+    const tant = spreadInt(10000, plan.map(l => l.S * (1 + 0.015 * l.f)));
+    const chauf = spreadInt(10000, plan.map(l => l.S * (l.f === 4 ? 1.08 : l.f === 0 ? 1.06 : 1)));
+    let po = 0, pb = 0;
+    const lots = plan.map((l, i) => {
+      const isPB = l.n % 4 === 0;
+      const owner = isPB ? "SCI " + SCI[pb++ % SCI.length] : CIVIL[(l.n + 1) % CIVIL.length] + " " + SURNAMES[(l.n * 7 + po) % SURNAMES.length];
+      const cat = isPB ? "" : CATS[po % 4];
+      if (!isPB) po++;
+      return { id: "lot_exemple_" + l.n, number: String(l.n), owner, tantiemes: tant[i], category: cat, occupancy: isPB ? "PB" : "PO",
+        buildingId: "", keys: { [KEY_ID]: chauf[i] }, surface: l.S };
+    });
+    const surfA = plan.filter(l => l.bt === "A").reduce((a, l) => a + l.S, 0);
+    const surfB = plan.filter(l => l.bt === "B").reduce((a, l) => a + l.S, 0);
+    const tantA = plan.reduce((a, l, i) => a + (l.bt === "A" ? tant[i] : 0), 0);
+
+    const meas = (value, origin, formula) => Schema.measurement({ value, origin, formula: formula || "", by: me, at: now,
+      sourceFile: origin === "import" ? "Liste des lots du syndic" : "" });
+    const bldA = Schema.building({ name: "Bâtiment A", nbDwellings: 24, nbLevels: 5, tantiemes: tantA, comment: "Escalier 1 · chaufferie n° 1 · 24 lots (RDC à R+4).",
+      metrics: { livingArea: meas(surfA, "import"), facadeArea: meas(990, "calcul", "(86 ml × 14 m) − 214 m² de baies"), roofArea: meas(372, "calcul", "31 m × 12 m (toiture-terrasse)"),
+        lowFloorArea: meas(372, "calcul", "31 m × 12 m (plancher bas sur parking)"), glazingArea: meas(214, "calcul", "130 baies × 1,65 m²"), networkLength: meas(105, "saisie") },
+      customMetrics: [{ label: "Nombre de menuiseries (DPE)", unit: "unité", measure: meas(130, "saisie") }, { label: "Balcons et loggias", unit: "unité", measure: meas(24, "saisie") }] });
+    const bldB = Schema.building({ name: "Bâtiment B", nbDwellings: 24, nbLevels: 5, tantiemes: 10000 - tantA, comment: "Escalier 2 · chaufferie n° 2 · 24 lots (RDC à R+4).",
+      metrics: { livingArea: meas(surfB, "import"), facadeArea: meas(952, "calcul", "(82 ml × 14 m) − 196 m² de baies"), roofArea: meas(348, "calcul", "29 m × 12 m (toiture-terrasse)"),
+        lowFloorArea: meas(348, "calcul", "29 m × 12 m (plancher bas sur parking)"), glazingArea: meas(196, "calcul", "119 baies × 1,65 m²"), networkLength: meas(95, "saisie") },
+      customMetrics: [{ label: "Nombre de menuiseries (DPE)", unit: "unité", measure: meas(119, "saisie") }, { label: "Balcons et loggias", unit: "unité", measure: meas(24, "saisie") }] });
+    lots.forEach((l, i) => { l.buildingId = plan[i].bt === "A" ? bldA.id : bldB.id; });
+    const livingArea = surfA + surfB;
+
+    // DPE d'échantillon : 12 logements représentatifs (RDC, courants, pignons, dernier étage)
+    const SAMPLE = [
+      [3, { rdc: 1, orient: "Sud" }], [7, { orient: "Ouest", perm: 0.15 }], [14, { orient: "Sud", effCh: 0.63, dh: 40 }], [11, { orient: "Est" }],
+      [18, { orient: "Sud", umur: 2.5 }], [23, { top: 1, uph: 1.5, orient: "Ouest" }],
+      [26, { rdc: 1, orient: "Sud" }], [30, { orient: "Ouest" }], [33, { orient: "Est", perm: 0.18 }], [38, { orient: "Sud", dh: 42 }],
+      [42, { orient: "Ouest", umur: 2.7 }], [46, { top: 1, uph: 1.5, orient: "Sud" }],
+    ];
+    const dpes = SAMPLE.map(([n, ov], k) => {
+      const l = plan[n - 1];
+      const data = dpeModel(Object.assign({ S: l.S, pignon: l.pignon }, ov));
+      delete data._calc;
+      const daysAgo = 62 + k * 7;
+      const est = isoIn(-daysAgo), vis = isoIn(-daysAgo - 9);
+      const valid = new Date(est); valid.setFullYear(valid.getFullYear() + 10);
+      const addr = l.bt === "A" ? "18" : "20";
+      data.admin = {
+        numero_dpe: "0000E00001" + String(n).padStart(2, "0") + "X", date_etablissement_dpe: est, date_visite_diagnostiqueur: vis, date_reception_dpe: est,
+        date_fin_validite_dpe: valid.toISOString().slice(0, 10), modele_dpe: "DPE 3CL 2021 méthode logement", version_logiciel: "Exemple 3CL 2026",
+        ban_label: addr + " Avenue des Tilleuls 69100 Villeurbanne", ban_postcode: "69100", ban_city: "Villeurbanne", ban_citycode: "69266",
+        ban_housenumber: addr, ban_street: "Avenue des Tilleuls", code_departement: "69", code_region: "84",
+        compl_ref_logement: "Lot n° " + n + " — Bâtiment " + l.bt + ", étage " + l.f, compl_etage_appartement: l.f,
+        geopoint: (FIRST.lat + (l.bt === "A" ? 0 : 0.0003)) + "," + (FIRST.lon + (l.bt === "A" ? 0 : 0.0004)),
+      };
+      data.logKV.nombre_niveau_immeuble = 5;
+      return { id: "dpe_exemple_" + n, fileName: "DPE-lot-" + String(n).padStart(2, "0") + "-bat-" + l.bt + ".xml", importedAt: stampAgo(daysAgo - 2, 11, 20), importedBy: me,
+        buildingId: l.bt === "A" ? bldA.id : bldB.id, data,
+        geo: { lat: FIRST.lat + (l.bt === "A" ? 0 : 0.0003), lon: FIRST.lon + (l.bt === "A" ? 0 : 0.0004), label: addr + " Avenue des Tilleuls 69100 Villeurbanne", score: 1 } };
+    });
+
+    const p = Schema.project({
+      name: "Les Tilleuls — Projet d'exemple", coproName: "Résidence Les Tilleuls", address: "18-20 avenue des Tilleuls (adresse fictive)", postalCode: "69100",
+      city: "Villeurbanne", department: "69", constructionYear: 1974, nbBuildings: 2, nbDwellings: 48, livingArea, floorArea: Math.round(livingArea * 1.22), nbLevels: 5,
+      heatingType: "Chaudière collective gaz", dhwType: "ECS collective (production centralisée)", energy: "Gaz naturel", studyDate: isoIn(-10), engineer: user,
+      reference: "EXEMPLE-2026-01", version: "V1", missionType: "PPPT", precisionLevel: "Estimation préliminaire", uncertainty: 15, totalTantiemes: 10000,
+      comment: "PROJET D'EXEMPLE (données fictives). Copropriété de 48 lots construite en 1974, deux bâtiments R+4, chauffage et eau chaude collectifs au gaz, " +
+        "toitures-terrasses et façades béton non isolées. Trois scénarios comparés : gestes ciblés, isolation de l'enveloppe et ventilation, rénovation globale. " +
+        "Parcourez les onglets pour voir comment chaque étape se remplit, puis dupliquez ce projet pour vous en servir de modèle.",
+      createdBy: user, buildings: [bldA, bldB], dpes,
+    });
+    p.id = ID;
+    p.demo = true; p.demoVersion = V;
+    p.lots = lots;
+    p.keys = [{ id: KEY_ID, name: "Chauffage collectif (millièmes de chauffage)" }];
+    p.geo = { lat: FIRST.lat, lon: FIRST.lon, label: "18 Avenue des Tilleuls 69100 Villeurbanne", score: 1 };
+    p.financing = { label: "Éco-PTZ copropriété", rate: 0, years: 20, apportPct: 0 };
+    p.commercial = { status: "encours", clientId: CLIENTS[0], feeMode: "pct", feeValue: 3.2, quoteDate: isoIn(-45), decisionDate: isoIn(-28),
+      notes: "Mission votée en assemblée générale. Restitution des trois scénarios au conseil syndical avant le vote des travaux." };
+
+    // Scénarios --------------------------------------------------------------------------------
+    const A = [bldA.id], B = [bldB.id], K = KEY_ID;
+    const heat = [
+      mkLine("Régulation de chaufferie (sonde extérieure, loi d'eau)", 2, { comment: "Une chaufferie par bâtiment." }),
+      mkLine("Équilibrage hydraulique réseau", 48, { formula: "Nombre de logements" }),
+      mkLine("Désembouage du réseau de chauffage", 48, { formula: "Nombre de logements" }),
+      mkLine("Robinets thermostatiques", 240, { formula: "48 logements × 5 radiateurs", comment: "Le relevé a montré 60 % de radiateurs sans robinet thermostatique." }),
+      mkLine("Calorifugeage des réseaux (tuyauteries)", 200, { formula: "Longueur des réseaux (A + B)" }),
+      mkLine("Calorifugeage des points singuliers (vannes, brides)", 60),
+      mkLine("Circulateurs à vitesse variable (chaufferie)", 4),
+      mkLine("Pot à boues / filtre magnétique (chaufferie)", 2),
+    ];
+    heat.forEach(l => { l.keyId = K; });
+    const ecs = () => [mkLine("Calorifugeage du bouclage ECS", 180), mkLine("Kit hydro-économe (mousseurs, douchette, régulateurs)", 48, { formula: "Nombre de logements" })];
+    const roof = () => [
+      mkLine("Étanchéité toit-terrasse + isolation PIR — R = 4,5 m².K/W", 372, { b: A, formula: "Surface de toiture — bâtiment A" }),
+      mkLine("Étanchéité toit-terrasse + isolation PIR — R = 4,5 m².K/W", 348, { b: B, formula: "Surface de toiture — bâtiment B" }),
+    ];
+    const lights = () => [mkLine("Éclairage LED parties communes", 120), mkLine("Détecteur de présence (éclairage)", 40)];
+
+    const cp = l => Object.assign({}, l, { id: Core.uid("lin"), coefficientIds: (l.coefficientIds || []).slice(), buildingIds: (l.buildingIds || []).slice() });
+    const heatLight = () => heat.slice(0, 2).map(cp);          // régulation de chaufferie + équilibrage seulement
+    const s1Lines = [].concat(heat.map(cp), ecs(), roof(),
+      [mkLine("Nettoyage des réseaux de ventilation", 48, { formula: "Nombre de logements" }), mkLine("Mesure des débits / réception VMC (protocole Promevent)", 48, { formula: "Nombre de logements" })], lights());
+
+    const heatFull = () => heat.map(cp)
+      .concat([Object.assign(mkLine("Répartiteurs de frais de chauffage (par radiateur)", 240, { formula: "48 logements × 5 radiateurs", comment: "Individualisation des frais de chauffage." }), { keyId: K })]);
+    const envelope = (ite) => {
+      const R4 = ["R+4 à R+7"];
+      const out = [mkLine("Échafaudage de façade (montage, location 3 mois, démontage)", 2330, { formula: "Surface de façade (A + B) × 1,2", coef: R4 })];
+      if (ite === "pse") {
+        out.push(mkLine("ITE complète — R = 3,7 m².K/W (≈15 cm, enduit finition)", 990, { b: A, coef: R4, formula: "Surface de façade — bâtiment A" }),
+          mkLine("ITE complète — R = 3,7 m².K/W (≈15 cm, enduit finition)", 952, { b: B, coef: R4, formula: "Surface de façade — bâtiment B" }),
+          mkLine("Bandes coupe-feu en laine de roche (ITE PSE)", 390, { formula: "Surface de façade × 0,2", comment: "Une bande à chaque plancher (bâtiment de plus de 8 m)." }));
+      } else {
+        out.push(mkLine("ITE laine de roche sous enduit — R ≥ 3,7 m².K/W", 990, { b: A, coef: R4, formula: "Surface de façade — bâtiment A", comment: "Laine de roche : incombustible, sans bande coupe-feu." }),
+          mkLine("ITE laine de roche sous enduit — R ≥ 3,7 m².K/W", 952, { b: B, coef: R4, formula: "Surface de façade — bâtiment B" }));
+      }
+      out.push(mkLine("Retours d'isolant en tableaux, voussures et appuis", 800), mkLine("Isolation sous-face de balcons / loggias", 192, { formula: "48 balcons × 4 m²" }),
+        mkLine("Rupteurs / traitement des ponts thermiques de liaison (nez de dalle, balcons)", 200), mkLine("Couvertines et bavettes d'appui", 168, { formula: "Périmètre des bâtiments (86 + 82 ml)" }),
+        mkLine("Descentes d'eaux pluviales (remplacement)", 120),
+        mkLine("Relevés d'étanchéité / acrotères", 168, { formula: "Périmètre des bâtiments" }), mkLine("Ligne de vie toiture permanente", 168, { comment: "Sécurité des interventions ultérieures en toiture." }));
+      // Plancher bas du parking : réservé à la rénovation globale (scénario 3)
+      if (ite === "rock") out.push(mkLine("Isolation plafond de sous-sol / parking par flocage — R ≥ 3 m².K/W", 372, { b: A, formula: "Surface de plancher bas — bâtiment A" }),
+        mkLine("Isolation plafond de sous-sol / parking par flocage — R ≥ 3 m².K/W", 348, { b: B, formula: "Surface de plancher bas — bâtiment B" }));
+      return out;
+    };
+    const vmc = () => [mkLine("VMC simple flux hygro B", 48, { formula: "Nombre de logements", comment: "Remplace la VMC autoréglable d'origine." }),
+      mkLine("Mesure des débits / réception VMC (protocole Promevent)", 48, { formula: "Nombre de logements" })];
+    const windows = () => [
+      mkLine("Menuiserie PVC double vitrage — Uw ≤ 1,3 W/m².K et Sw ≥ 0,3 (ou Uw ≤ 1,7 et Sw ≥ 0,36)", 110, { b: A, formula: "130 baies × 85 %", comment: "15 % des fenêtres ont déjà été remplacées par les copropriétaires." }),
+      mkLine("Menuiserie PVC double vitrage — Uw ≤ 1,3 W/m².K et Sw ≥ 0,3 (ou Uw ≤ 1,7 et Sw ≥ 0,36)", 101, { b: B, formula: "119 baies × 85 %" }),
+      mkLine("Porte d'entrée immeuble (remplacement)", 4, { comment: "Deux halls par bâtiment." }), mkLine("Châssis de cage d'escalier (parties communes)", 10)];
+
+    const s2Lines = [].concat(heatLight(), ecs(), roof(), envelope("pse"), vmc(), lights());
+    const opt = l => { l.option = true; return l; };
+    s2Lines.push(opt(mkLine("PV en autoconsommation collective (> 9 kWc)", 36, { comment: "Option : à chiffrer avec la société d'autoconsommation." })),
+      opt(mkLine("Pré-équipement IRVE (infrastructure collective)", 24, { comment: "Option : un emplacement par lot de parking." })));
+    const pac = mkLine("PAC air/eau collective (copropriété)", 2, { comment: "Chauffage : une PAC par bâtiment. Les chaudières gaz sont conservées uniquement en appoint de l'ECS solaire." }); pac.keyId = K;
+    const s3Lines = [].concat(heatFull(), [pac, mkLine("CESC — Chauffe-eau solaire collectif", 48, { formula: "Nombre de logements", comment: "Solaire thermique en toiture : couvre environ 45 % des besoins d'eau chaude." })], ecs(), roof(), envelope("rock"), windows(), vmc(), lights(),
+      [mkLine("PV en autoconsommation collective (> 9 kWc)", 36, { comment: "Toitures-terrasses : environ 180 m² de panneaux." }),
+        mkLine("Raccordement Enedis / compteur de production", 1)]);
+    s3Lines.push(opt(mkLine("Pré-équipement IRVE (infrastructure collective)", 24)));
+
+    const fee = (label, mode, value, vat, comment) => Schema.fee({ label, mode, value, vatRate: vat, comment: comment || "" });
+    const fees1 = [fee("Installation de chantier", "pct", 3, 20), fee("Évacuation des déchets", "pct", 1, 10), fee("Maîtrise d'œuvre", "pct", 4, 20),
+      fee("Coordination SPS", "forfait", 1800, 20), fee("Aléas et imprévus", "pct", 5, 20)];
+    const fees2 = () => [fee("Installation de chantier", "pct", 2.5, 20), fee("Évacuation des déchets", "pct", 1, 10), fee("Études techniques", "pct", 1.5, 20),
+      fee("Maîtrise d'œuvre", "pct", 5, 20), fee("Coordination SPS", "forfait", 6500, 20), fee("Contrôle technique", "forfait", 7500, 20),
+      fee("Assurance dommages-ouvrage", "pct", 1.8, 20), fee("AMO MaPrimeRénov' Copropriété", "logement", 800, 20, "800 € HT par logement (assistance obligatoire)."),
+      fee("Aléas et imprévus", "pct", 3, 20)];
+    const fees3 = fees2().concat([fee("Commissionnement / suivi après travaux", "forfait", 4000, 20)]);
+
+    const scn = (name, description, color, lines, fees, selected) => Schema.scenario({ name, description, color, selected, lines, fees });
+    p.scenarios = [
+      scn("1 · Gestes ciblés", "Budget minimal : régulation et calorifugeage de la chaufferie, équilibrage des réseaux, isolation des toitures-terrasses. Gain insuffisant pour MaPrimeRénov' Copropriété.", "#B5D4F4", s1Lines, fees1, false),
+      scn("2 · Enveloppe et ventilation", "Isolation des façades par l'extérieur, des toitures et du plancher bas, VMC hygroréglable, régulation et équilibrage de la chaufferie. Scénario recommandé au conseil syndical : il ouvre droit à MaPrimeRénov' Copropriété au taux de 30 %.", "#C0DD97", s2Lines, fees2(), true),
+      scn("3 · Rénovation globale", "Isolation complète de l'enveloppe (laine de roche), remplacement des fenêtres, pompes à chaleur collectives pour le chauffage, eau chaude solaire, photovoltaïque en autoconsommation et optimisation complète du chauffage.", "#F5C4B3", s3Lines, fees3, false),
+    ];
+
+    // Économie : consommation du bâtiment entier (DPE d'échantillon extrapolés à la surface totale)
+    const base = Dpe.energyBaseline(p.dpes, p);
+    p.economics = Schema.economics({ consoBefore: base.conso, energyPrice: round(base.price, 3), opexBefore: 0, opexAfter: 0, discountRate: 4, horizon: 25, energyInflation: 3 });
+
+    // Grandeurs dérivées calculées par les moteurs de l'application
+    const rule = name => (Repo.aidRules.all().find(r => r.name === name) || {}).id || null;
+    p.scenarios.forEach(s => {
+      let est = null, cee = null;
+      try { est = Perf.estimate(p, s); cee = Perf.ceeFor(p, s); } catch (e) { console.warn("Exemple : estimation impossible", e); }
+      const gainEF = est ? est.gainEF : 0, gainEP = est ? est.gainEP : 0;
+      s.energySavingPct = round(gainEF * 100, 1);
+      const nb = 48, rate = gainEP >= 0.5 ? 45 : gainEP >= 0.35 ? 30 : 0;
+      s.aids = [];
+      s.aids.push(Schema.aid({ ruleId: rule("MaPrimeRénov' Copropriété"), label: rate ? "MaPrimeRénov' Copropriété — " + rate + " % (gain ≥ " + (rate === 45 ? 50 : 35) + " %)" : "MaPrimeRénov' Copropriété — non éligible (gain < 35 %)",
+        mode: "pct", value: rate, basis: "ht", cap: rate ? round(rate / 100 * 25000 * nb, 0) : 0, verified: false,
+        comment: rate ? "Estimation BET selon le barème publié en 2026 : 30 % si gain ≥ 35 %, 45 % si gain ≥ 50 %, dépenses plafonnées à 25 000 € HT par logement. À confirmer avec l'Anah et l'audit réglementaire."
+          : "Le gain énergétique estimé (" + round(gainEP * 100, 0) + " %) est inférieur au seuil de 35 % : le scénario n'ouvre pas droit à l'aide collective." }));
+      if (rate) s.aids.push(Schema.aid({ ruleId: null, label: "Prise en charge de l'AMO (50 %, plafond 600 € par logement)", mode: "logement", value: 400, basis: "ht", cap: 0, verified: false,
+        comment: "50 % de 800 € HT par logement, inférieur au plafond de 600 €. À vérifier." }));
+      if (cee && cee.totalEur > 0) s.aids.push(Schema.aid({ ruleId: rule("CEE — Coup de pouce rénovation"), label: "CEE (estimation BET)", mode: "forfait", value: roundTo(cee.totalEur, 100), basis: "ht", cap: 0, verified: false,
+        comment: "Calculé depuis les fiches standardisées (onglet Performance) — à confirmer avec l'obligé avant signature des devis." }));
+    });
+
+    // Le texte de chaque scénario rappelle le résultat calculé (jamais un chiffre écrit en dur)
+    p.scenarios.forEach(s => {
+      try {
+        const e = Perf.estimate(p, s);
+        if (e) s.description += " Résultat estimé : gain énergétique de " + Math.round(e.gainEP * 100) + " % (étiquette " + e.before.cls + " → " + e.after.cls + ").";
+      } catch (err) { /* description sans résultat */ }
+    });
+
+    // Planning depuis le scénario retenu, puis devis comparés à l'estimation par lot
+    const s2 = p.scenarios[1];
+    p.planning = { start: mondayIn(240), tasks: Planning.generate(p, s2) };
+    const t2 = Calc.scenarioTotals(s2, p, Ext.refs());
+    const byCat = {}; t2.lines.forEach(({ line, t }) => { byCat[line.categoryId || ""] = (byCat[line.categoryId || ""] || 0) + t.totalHT; });
+    const cid = name => (catByName(name) || {}).id || "";
+    const est = name => byCat[cid(name)] || 0;
+    const Q = (company, catName, k, retained, notes, validity) => ({ id: "dev_exemple_" + Core.slug(company + catName), company, categoryId: cid(catName),
+      amountHT: roundTo(est(catName) * k, 100), date: isoIn(-20), validity: isoIn(60), notes, retained });
+    p.quotes = [
+      Q("Entreprise Alpha", "Façades & Isolation Extérieure", 0.94, true, "Devis fictif. Retenu : références ITE en R+4, délai de 16 semaines, échafaudage compris."),
+      Q("Entreprise Bêta", "Façades & Isolation Extérieure", 1.03, false, "Devis fictif. Variante enduit minéral, délai de 18 semaines."),
+      Q("Entreprise Gamma", "Façades & Isolation Extérieure", 1.12, false, "Devis fictif. Reprise des balcons en supplément."),
+      Q("Entreprise Delta", "Toiture & Combles", 0.97, true, "Devis fictif. Étanchéité bicouche, garantie décennale fournie."),
+      Q("Entreprise Epsilon", "Toiture & Combles", 1.08, false, "Devis fictif. Isolant XPS en isolation inversée."),
+      Q("Entreprise Zêta", "Chauffage & Régulation", 1.02, true, "Devis fictif. Intervention chaufferie par bâtiment, sans coupure de plus d'une journée."),
+      Q("Entreprise Êta", "Chauffage & Régulation", 1.09, false, "Devis fictif. Régulation connectée en option."),
+      Q("Entreprise Thêta", "Ventilation", 0.96, true, "Devis fictif. Bouches hygroréglables, réception Promevent incluse."),
+      Q("Entreprise Iota", "Ventilation", 1.06, false, "Devis fictif. Réception en supplément."),
+    ].filter(q => q.categoryId);
+
+    // Visite de chantier
+    const S = (state, note) => ({ state, note: note || "" });
+    const CH = {
+      "Façades": [S("mauvais", "Enduit dégradé, fissures en façade nord et sur les pignons"), S("mauvais", "Fissures horizontales au droit des nez de dalle"), S("moyen", "Garde-corps corrodés : six balcons à traiter"),
+        S("moyen", "Double vitrage bois d'origine, joints fatigués"), S("bon", "Volets roulants PVC remplacés en 2008"), S("mauvais", "Ponts thermiques marqués aux balcons")],
+      "Toiture": [S("moyen", "Étanchéité vieillissante, relevés fissurés"), S("mauvais", "Isolant de 4 cm, très en dessous des exigences actuelles"), S("moyen", "Pas de ligne de vie : à créer"),
+        S("moyen", "Descentes d'eaux pluviales à remplacer sur les pignons"), S("bon", "Locaux techniques accessibles")],
+      "Chauffage": [S("moyen", "Deux chaufferies gaz, une par bâtiment"), S("moyen", "Chaudières de 1995, rendement estimé à 80 %"), S("mauvais", "Réseaux de caves peu ou pas calorifugés"),
+        S("mauvais", "Pas de robinet thermostatique sur 60 % des radiateurs"), S("moyen", "Sonde extérieure présente, pas de loi d'eau"), S("mauvais", "Pas de comptage individuel")],
+      "Eau chaude sanitaire": [S("moyen", "Production collective par chaudière, ballons de 1 500 L"), S("mauvais", "Bouclage non calorifugé, pertes importantes"), S("mauvais", "Pas de compteurs individuels")],
+      "Ventilation": [S("moyen", "VMC simple flux autoréglable d'origine"), S("moyen", "Bouches encrassées"), S("mauvais", "Caissons anciens, moteurs bruyants"), S("na", "Sans objet : pas de chaudière gaz individuelle")],
+      "Parties communes": [S("bon", "Halls refaits en 2015"), S("moyen", "Éclairage ancien sur minuterie"), S("moyen", "Caves et parking non isolés en plafond"), S("moyen", "Colonnes montantes électriques d'origine")],
+      "Sécurité et diagnostics": [S("moyen", "BAES à compléter"), S("bon", "Repérage amiante avant travaux fourni par le syndic"), S("bon", "CREP à jour"), S("moyen", "Accessibilité des halls à améliorer")],
+    };
+    const checks = {};
+    Visite.GROUPS.forEach(([g, items]) => items.forEach((label, i) => { const c = (CH[g] || [])[i]; if (c) checks[Core.slug(g) + "-" + i] = c; }));
+    p.visit = { date: isoIn(-12), by: me, checks,
+      measures: [{ label: "Périmètre du bâtiment A", value: 86, unit: "ml" }, { label: "Hauteur totale (acrotère compris)", value: 14, unit: "m" },
+        { label: "Fenêtres et portes-fenêtres — bâtiment A", value: 130, unit: "u" }, { label: "Fenêtres et portes-fenêtres — bâtiment B", value: 119, unit: "u" },
+        { label: "Longueur de réseaux en caves", value: 200, unit: "ml" }, { label: "Puissance installée (2 chaudières)", value: 400, unit: "kW" }],
+      notes: "Accès facile depuis l'avenue. Chaufferies visitées avec le gestionnaire de l'immeuble. Le conseil syndical souhaite un scénario finançable sur 15 à 20 ans et des travaux menés bâtiment par bâtiment. " +
+        "Prévoir un repérage amiante complémentaire sur les enduits de façade avant travaux." };
+
+    // Journal : historique plausible de l'étude
+    const J = (d, h, what, detail, count) => ({ at: stampAgo(d, h, (d * 7 + h) % 60), by: me, what, detail: detail || "", count: count || 1 });
+    p.journal = [
+      J(24, 9, "Fiche projet", "Création du projet : mission PPPT de la copropriété", 3), J(22, 14, "Fiche projet", "Suivi commercial : mission acceptée par l'assemblée générale", 2),
+      J(12, 10, "Visite", "Visite technique : chaufferies, toitures-terrasses, façades", 8), J(10, 15, "Diagnostic DPE", "Import de 12 DPE d'échantillon (6 par bâtiment)", 2),
+      J(10, 16, "Bâtiments & métrés", "Métrés calculés : façades, toitures, planchers bas, vitrages", 4), J(8, 11, "Scénarios", "Création des trois scénarios", 3),
+      J(8, 14, "Travaux", "Scénario 1 · Gestes ciblés : 16 postes", 6), J(7, 10, "Travaux", "Scénario 2 · Enveloppe et ventilation : postes, quantités liées aux métrés", 9),
+      J(6, 15, "Travaux", "Scénario 3 · Rénovation globale : fenêtres, PAC, photovoltaïque", 5), J(6, 17, "Frais annexes", "Honoraires et frais annexes par scénario", 3),
+      J(5, 10, "Performance", "Estimation de l'étiquette après travaux, calcul des CEE", 4), J(5, 16, "Aides & reste à charge", "MaPrimeRénov' Copropriété : taux selon le gain, AMO, CEE", 3),
+      J(3, 11, "Copropriétaires", "Saisie des 48 lots, tantièmes et millièmes de chauffage", 5), J(2, 14, "Devis entreprises", "Comparaison de neuf devis par lot", 4),
+      J(1, 10, "Planning", "Planning prévisionnel généré depuis le scénario 2", 2),
+    ];
+    return { p, clients: buildClients(), tasks: buildTasks() };
+  }
+
+  function buildClients() {
+    return [
+      { id: CLIENTS[0], name: "Cabinet Syndic Exemple", type: "Syndic", contact: "Mme Durand (contact fictif)", email: "", phone: "", address: "Villeurbanne (adresse fictive)",
+        notes: "Client d'exemple : syndic de la Résidence Les Tilleuls. Vous pouvez le supprimer.", createdAt: Core.nowIso(), demo: true },
+      { id: CLIENTS[1], name: "Conseil syndical — Résidence Les Tilleuls", type: "Conseil syndical", contact: "M. Bernard, président (contact fictif)", email: "", phone: "", address: "",
+        notes: "Client d'exemple.", createdAt: Core.nowIso(), demo: true },
+    ];
+  }
+  function buildTasks() {
+    const T = (i, title, type, due, time, done, notes, client) => ({ id: TASKS[i], title, type, due, time, projectId: ID, clientId: client || CLIENTS[0], notes, done, createdAt: Core.nowIso(), demo: true });
+    return [
+      T(0, "Visite technique des chaufferies et des toitures-terrasses", "Visite", isoIn(-12), "", true, "Fait : relevé des équipements et des métrés."),
+      T(1, "Présenter les trois scénarios au conseil syndical", "Rendu d'étude", isoIn(14), "18:30", false, "Comparer le reste à charge par lot et la mensualité de l'éco-PTZ.", CLIENTS[1]),
+      T(2, "Relancer le syndic pour la date de l'assemblée générale", "Relance", isoIn(30), "", false, "Le vote des travaux doit avoir lieu avant la consultation des entreprises."),
+      T(3, "Déposer le dossier MaPrimeRénov' Copropriété après le vote", "Dépôt de dossier d'aides", isoIn(90), "", false, "Prévoir le mandat de l'AMO et les devis signés."),
+    ];
+  }
+
+  /* ---------------------------------------------------- Création / suppression */
+  const exists = () => !!Repo.projects.get(ID);
+
+  async function create() {
+    if (exists()) return Repo.projects.get(ID);
+    Journal.mute(true);
+    try { return await createInner(); } finally { Journal.mute(false); }
+  }
+  async function createInner() {
+    const { p, clients, tasks } = build();
+    const st = Repo.state();
+    st.projects.push(p);
+    st.clients = st.clients || []; st.tasks = st.tasks || [];
+    clients.forEach(c => { if (!st.clients.some(x => x.id === c.id)) st.clients.push(c); });
+    tasks.forEach(t => { if (!st.tasks.some(x => x.id === t.id)) st.tasks.push(t); });
+    st.meta = st.meta || {};
+    st.meta.demo = { at: Core.nowIso(), v: V };
+    ["projects", "clients", "tasks", "meta"].forEach(k => Repo.touch(k));
+    await Repo.flush();
+    return p;
+  }
+
+  /** À la connexion : une seule fois par compte, et jamais avant d'avoir lu l'espace en ligne (pas de doublon, pas de retour après suppression). */
+  async function ensure() {
+    const st = Repo.state();
+    if (!st) return false;
+    st.meta = st.meta || {};
+    if (st.meta.demo) return false;
+    if (!Repo.isOnline()) return false;
+    // Le catalogue commun doit contenir les postes utilisés (pack installé par l'administrateur) : sinon on réessaie plus tard.
+    const have = new Set(Repo.items.all().map(i => i.label));
+    const found = Object.keys(FALLBACK).filter(l => have.has(l)).length;
+    if (found < Object.keys(FALLBACK).length * 0.8 && !Auth.can("catalogWrite")) return false;
+    if (exists()) { st.meta.demo = { at: Core.nowIso(), v: V }; Repo.touch("meta"); await Repo.flush(); return false; }
+    try { await create(); } catch (e) { console.warn("Projet d'exemple non créé", e); return false; }
+    return true;
+  }
+
+  /** Retire les clients et tâches d'exemple avec le projet (sans toucher à ceux que l'utilisateur a créés). */
+  async function afterRemove() {
+    const st = Repo.state();
+    st.tasks = (st.tasks || []).filter(t => !(t.demo && t.projectId === ID));
+    const used = new Set(Repo.projects.all().map(p => (p.commercial || {}).clientId).filter(Boolean));
+    (st.tasks || []).forEach(t => { if (t.clientId) used.add(t.clientId); });
+    st.clients = (st.clients || []).filter(c => !(c.demo && !used.has(c.id)));
+    Repo.touch("tasks"); Repo.touch("clients");
+    await Repo.flush();
+  }
+
+  function banner(p) {
+    if (!p || !p.demo) return "";
+    const w = Auth.can("projectWrite");
+    return `<div class="notice demo-banner">${icon("info", 15)}<div style="flex:1"><strong>Projet d'exemple — données fictives.</strong>
+      Parcourez les onglets pour voir un dossier complet (DPE, métrés, trois scénarios, aides, lots, devis, planning, visite).
+      ${w ? "Dupliquez-le pour vous en servir de modèle, " : ""}modifiez-le librement, ou supprimez-le : vous pourrez le recréer depuis la liste des projets.</div>
+      <div class="row" style="gap:6px">${w ? `<button class="btn btn-sm" data-act="prjDup" data-id="${esc(p.id)}">${icon("copy", 14)} Dupliquer</button>` : ""}
+      <button class="btn btn-sm btn-danger" data-act="prjDel" data-id="${esc(p.id)}">${icon("trash", 14)} Supprimer</button></div></div>`;
+  }
+  const tag = p => (p && p.demo ? `<span class="tag ember" title="Projet d'exemple fourni avec l'application">EXEMPLE</span>` : "");
+
+  UI.register({
+    demoCreate: async () => {
+      if (exists()) { UI.toast("Le projet d'exemple est déjà dans votre liste.", "ok"); return App.go("project", { projectId: ID, tab: "fiche" }); }
+      try {
+        const p = await create();
+        UI.toast("Projet d'exemple ajouté.", "ok");
+        App.go("project", { projectId: p.id, tab: "fiche" });
+      } catch (e) { console.error(e); UI.toast("Création impossible : " + e.message, "err", 6000); }
+    },
+  }, UI.Actions);
+
+  return { ensure, create, exists, afterRemove, banner, tag, ID };
+})();
+
+
+/* ------------------------------------------------------------------------
  * Guide des nouveautés (manuel intégré à l'application).
  * ---------------------------------------------------------------------- */
 const Guide = (() => {
   "use strict";
   const { esc } = Core;
   const icon = UI.icon;
-  const VERSION = "2.0";
+  const VERSION = "2.1";
 
   const SECTIONS = [
+    { t: "Prise en main", items: [
+      { ic: "star", h: "Projet d'exemple complet", where: "Projets → « Résidence Les Tilleuls — Projet d'exemple »",
+        what: "Une copropriété fictive de 48 lots (deux bâtiments R+4 de 1974, chauffage et eau chaude collectifs au gaz) étudiée de bout en bout : 12 DPE d'échantillon, métrés, trois scénarios comparés (gestes ciblés, enveloppe et ventilation, rénovation globale), frais annexes, aides selon le gain énergétique, répartition par lot, devis, planning, visite et journal.",
+        how: ["Il est ajouté une seule fois à l'espace privé de chaque compte : vous seul le voyez.",
+          "Modifiez-le librement ou supprimez-le (icône corbeille). Pour le retrouver : Projets → « Ajouter le projet d'exemple ».",
+          "« Dupliquer » en fait un modèle de départ pour un vrai dossier.",
+          "Il n'est compté ni dans les statistiques du tableau de bord, ni dans le suivi des affaires, ni dans les retards de tâches."],
+        note: "Toutes les données (noms, adresses, prix, devis, contacts) sont fictives." },
+    ] },
     { t: "Catalogue et chiffrage", items: [
       { ic: "book", h: "Catalogue enrichi : 205 postes, 13 catégories", where: "Catalogue de prix",
         what: "145 nouveaux postes (façades, toiture, chauffage, ventilation, amiante, plomberie, accessibilité, études…), 5 nouvelles catégories et les unités kWc, place et tonne. Chaque poste a un descriptif prêt pour le CCTP et, quand il existe, son critère de performance et sa fiche CEE. Les TVA ont été mises à jour (chaudières gaz à 20 %, fenêtres et bornes de recharge à 5,5 %…).",
@@ -14835,6 +15422,9 @@ const Guide = (() => {
         what: "Estimation de l'étiquette après travaux à partir des déperditions des DPE rattachés et des postes du scénario : énergie primaire, CO₂, gain en %, économies en kWh et en €/an.",
         how: ["Rattachez les DPE au projet (sans DPE : saisissez un état initial approximatif).", "Ajustez si besoin la « couverture » de chaque poste (part de la façade isolée, etc.).", "« Reporter le gain dans l'analyse économique » alimente la VAN et le temps de retour."],
         note: "Méthode simplifiée (ratios de déperditions et rendements types, électricité à 1,9) : elle ne remplace ni un calcul 3CL ni l'audit réglementaire." },
+      { ic: "gauge", h: "Échantillon de DPE rapporté à tout l'immeuble", where: "Projet → Performance et Analyse économique",
+        what: "Quand seuls quelques DPE représentatifs sont rattachés, la consommation avant travaux, les économies annuelles et les émissions évitées sont rapportées à la surface habitable du projet. L'étiquette après travaux et le gain en % ne changent pas.",
+        how: ["Un message dans l'onglet Performance indique la surface de l'échantillon et la surface utilisée."] },
       { ic: "check", h: "Éligibilité et obligations", where: "Projet → Performance",
         what: "Conformité de chaque poste à son critère (ex. R ≥ 7 pour les combles), seuils de gain de MaPrimeRénov' Copropriété (35 % et 50 %), sortie de passoire, et calendrier d'interdiction de location (G 2025, F 2028, E 2034).", how: [] },
       { ic: "euro", h: "Certificats d'économies d'énergie", where: "Projet → Performance ; réglages : Paramètres → CEE",
@@ -14916,8 +15506,8 @@ const Guide = (() => {
   function banner() {
     const m = Repo.state().meta || {};
     if (m.guideSeen === VERSION) return "";
-    return `<div class="notice guide-banner">${icon("star", 16)}<div style="flex:1"><strong>Nouvelle version ${VERSION}</strong> — performance après travaux, copropriétaires,
-      devis, planning, livrables Word, partage de projets, 145 postes de catalogue… <a href="#guide" data-act="go" data-route="guide">Découvrir les nouveautés</a></div>
+    return `<div class="notice guide-banner">${icon("star", 16)}<div style="flex:1"><strong>Nouvelle version ${VERSION}</strong> — un projet d'exemple complet (copropriété de 48 lots, trois scénarios)
+      est dans votre liste de projets ; performance après travaux, copropriétaires, devis, planning, livrables Word… <a href="#guide" data-act="go" data-route="guide">Découvrir les nouveautés</a></div>
       <button class="btn btn-ghost btn-sm" data-act="guideSeen">Masquer</button></div>`;
   }
 
