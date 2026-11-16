@@ -1,0 +1,13 @@
+Bibliothèques tierces utilisées par la page d'accueil (copies locales, versions figées)
+
+1. three.js r170 (0.170.0) — licence MIT
+   https://github.com/mrdoob/three.js
+   Seules les parties utilisées sont incluses dans assets/scene.js (compilation « tree-shaking »).
+   Texte de la licence : assets/libs/three-LICENSE.txt
+
+2. GSAP 3.13.0 et son plugin ScrollTrigger — licence GSAP « Standard no-charge license »
+   https://gsap.com/standard-license
+   Fichiers : assets/libs/gsap.min.js et assets/libs/ScrollTrigger.min.js (non modifiés).
+
+Le code propre au site (assets/animations.js, assets/src/scene.src.js) est la propriété de CheckChiffreBet.
+assets/scene.js est la version compilée de assets/src/scene.src.js avec three.js.
