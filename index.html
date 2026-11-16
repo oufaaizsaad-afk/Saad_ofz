@@ -232,7 +232,65 @@ h3{font-size:18px;font-weight:600;line-height:1.35}
 .prose th{background:var(--ground);color:var(--ink);font-weight:600}
 .todo{background:#FFF4D6;color:#5A4300;padding:1px 6px;border-radius:5px;font-weight:600}
 .table-wrap{overflow-x:auto}
-@media (max-width:600px){section,.cta{padding:64px 0}.hero{padding:44px 0 56px}.section-head{margin-bottom:30px}.hero-ctas .btn{flex:1 1 100%}}</style>
+@media (max-width:600px){section,.cta{padding:64px 0}.hero{padding:44px 0 56px}.section-head{margin-bottom:30px}.hero-ctas .btn{flex:1 1 100%}}
+/* ===== Effets 3D et animations (assets/animations.js) ===== */
+.stage{position:relative;border-radius:24px;overflow:hidden;isolation:isolate;padding:22px 22px 14px;background:radial-gradient(520px 320px at 85% 0%,#1D5B76 0%,rgba(29,91,118,0) 70%),linear-gradient(160deg,#16394B,#0F2230 72%);box-shadow:0 40px 70px -34px rgba(16,34,46,.55),inset 0 0 0 1px rgba(255,255,255,.07)}
+.stage .mock-fig{position:relative;z-index:1;transition:opacity .6s,visibility .6s}
+.stage .mock-note{color:#9FB6C2}
+.stage .mock{box-shadow:0 30px 50px -24px rgba(0,0,0,.6)}
+.stage-canvas{position:absolute;inset:0;z-index:2;opacity:0;visibility:hidden;transition:opacity .9s ease,visibility 0s;pointer-events:none}
+.stage.on .stage-canvas{opacity:1;visibility:visible}
+.stage.on .mock-fig{opacity:0;visibility:hidden}
+.stage-ui{position:absolute;inset:0;z-index:3;pointer-events:none;visibility:hidden;opacity:0;transition:opacity .7s .25s,visibility 0s}
+.stage.on .stage-ui{visibility:visible;opacity:1}
+.chip{position:absolute;top:16px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;letter-spacing:.02em;color:#fff;background:rgba(255,255,255,.13);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.2);transition:opacity .3s}
+.chip-l{left:16px}
+.chip-r{right:16px;background:rgba(228,71,59,.26)}
+.split{position:absolute;top:0;bottom:0;left:50%;width:44px;margin-left:-22px;pointer-events:auto;cursor:ew-resize;touch-action:none;outline:none}
+.split::before{content:"";position:absolute;left:21px;top:0;bottom:0;width:2px;background:linear-gradient(rgba(255,255,255,0),#fff 14%,#fff 86%,rgba(255,255,255,0));box-shadow:0 0 14px rgba(255,255,255,.55)}
+.split-knob{position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;background:#fff;color:var(--accent-strong);display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.35);transition:transform .2s}
+.split:hover .split-knob,.split.drag .split-knob{transform:scale(1.1)}
+.split:focus-visible .split-knob{outline:3px solid #F0B679;outline-offset:3px}
+.stage-steps .split{pointer-events:none}
+.stage-steps .split-knob{display:none}
+.legend{position:absolute;right:14px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;font-size:10.5px;color:#C6D6DF;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.legend i{display:block;width:8px;height:112px;border-radius:99px;background:linear-gradient(#EDE3A5,#F2B845 20%,#EE7333 40%,#D1383B 58%,#7A2A8C 78%,#1F2B7A)}
+.float-card{position:absolute;left:14px;bottom:52px;width:152px;padding:9px 11px;border-radius:14px;background:rgba(255,255,255,.95);box-shadow:0 18px 40px -14px rgba(0,0,0,.55);color:var(--ink)}
+.float-card .k{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);font-weight:600}
+.float-card .cls-row{margin-top:6px}
+.float-card .gain{font-size:13px}.float-card .cls{width:26px;height:26px;font-size:14px}.float-card .s{font-size:10px;color:var(--text-3);margin-top:4px;line-height:1.35}
+.stage-hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);margin:0;padding:5px 13px;border-radius:99px;font-size:12px;color:#E8F0F5;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);white-space:nowrap;transition:opacity .5s}
+.stage-hint.gone{opacity:0}
+/* Étapes : scène collante à gauche, étapes à droite (bureau uniquement, une fois la 3D active) */
+.stage-steps{display:none}
+@media (min-width:921px){
+.has-3d .steps-layout{display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);gap:44px;align-items:start}
+.has-3d .stage-steps{display:block;position:sticky;top:calc(var(--head) + 26px);height:min(560px,calc(100vh - var(--head) - 60px));min-height:420px;padding:0}
+.has-3d .steps{grid-template-columns:1fr;gap:16px}
+.has-3d .step{min-height:150px;transition:border-color .4s,box-shadow .4s}
+.has-3d .step.is-active{border-color:var(--accent-2);box-shadow:0 18px 40px -22px rgba(18,56,74,.5)}
+}
+/* Chiffres clés */
+.stats{padding:0;background:var(--surface);border-bottom:1px solid var(--line)}
+.stats-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.stat{padding:34px 28px;border-left:1px solid var(--line)}
+.stat:first-child{border-left:0;padding-left:0}
+.stat-n{margin:0;font-family:var(--f-serif);font-weight:600;font-size:clamp(40px,5vw,60px);line-height:1;color:var(--accent-strong);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat-l{margin:10px 0 0;color:var(--text-2);font-size:15px;max-width:22em}
+@media (max-width:720px){.stats-grid{grid-template-columns:1fr}.stat{border-left:0;border-top:1px solid var(--line);padding:22px 0}.stat:first-child{border-top:0}}
+/* Captures : barre de navigateur, inclinaison 3D qui se redresse au survol */
+.shots{perspective:1500px}
+.shot::before{content:"";display:block;height:30px;border-bottom:1px solid var(--line);background:radial-gradient(circle 4.5px at 16px 15px,#E9776E 97%,#0000),radial-gradient(circle 4.5px at 32px 15px,#F2C14E 97%,#0000),radial-gradient(circle 4.5px at 48px 15px,#62C16B 97%,#0000),#F6F8FA}
+.fx .shot{--k:1;transition:rotate .45s cubic-bezier(.2,.7,.2,1),translate .45s cubic-bezier(.2,.7,.2,1),box-shadow .45s}
+.fx .shot:nth-child(odd){rotate:.3 1 0 calc(11deg * var(--k) * var(--hv,1))}
+.fx .shot:nth-child(even){rotate:.3 -1 0 calc(11deg * var(--k) * var(--hv,1))}
+.fx .shot:hover{--hv:0;translate:0 -6px 30px;box-shadow:0 30px 60px -24px rgba(16,34,46,.45)}
+/* Appel à l'action : halo lumineux lent */
+.cta-box>*{position:relative;z-index:1}
+.fx .cta-box::after{content:"";position:absolute;inset:-40%;background:conic-gradient(from 0deg at 80% 20%,rgba(240,182,121,0),rgba(240,182,121,.15),rgba(240,182,121,0) 30%);animation:ctaSpin 16s linear infinite;pointer-events:none}
+@keyframes ctaSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.fx .cta-box::after{animation:none}.stage-canvas,.stage-ui{display:none}}
+</style>
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://checkchiffrebet.pro/#website","url":"https://checkchiffrebet.pro/","name":"CheckChiffreBet","inLanguage":"fr-FR","publisher":{"@id":"https://checkchiffrebet.pro/#editeur"}},{"@type":"Person","@id":"https://checkchiffrebet.pro/#editeur","name":"Saad Oufaaiz"},{"@type":"WebApplication","@id":"https://checkchiffrebet.pro/#application","name":"CheckChiffreBet","url":"https://checkchiffrebet.pro/","applicationCategory":"BusinessApplication","applicationSubCategory":"Chiffrage de travaux de rénovation énergétique","operatingSystem":"Web","browserRequirements":"Navigateur récent avec JavaScript activé","inLanguage":"fr-FR","description":"Plateforme web pour bureaux d'études : analyse des DPE ADEME, chiffrage de scénarios de travaux, aides et reste à charge par lot, DPGF, CCTP et rapports.","featureList":["Import et synthèse des DPE (Excel 3CL et XML ADEME)","Recherche d'un DPE par numéro","Métrés par bâtiment","Catalogue de prix commun avec actualisation BT01","Scénarios de travaux, bouquets et options","Estimation de la performance après travaux et des CEE","Aides et reste à charge par lot de copropriété","DPGF Excel, CCTP et rapport Word, présentation d'assemblée générale PDF","Devis, planning, visite de chantier et journal","Clients, affaires et tâches exportables en .ics","Projets privés par compte, partage et double authentification"],"image":"https://checkchiffrebet.pro/og-image.jpg","audience":{"@type":"BusinessAudience","audienceType":"Bureaux d'études techniques et maîtres d'œuvre"},"author":{"@id":"https://checkchiffrebet.pro/#editeur"}},{"@type":"FAQPage","@id":"https://checkchiffrebet.pro/#faq","inLanguage":"fr-FR","mainEntity":[{"@type":"Question","name":"À qui s'adresse CheckChiffreBet ?","acceptedAnswer":{"@type":"Answer","text":"Aux bureaux d'études techniques (thermique, fluides, économie de la construction) et aux maîtres d'œuvre qui chiffrent des travaux de rénovation énergétique : PPPT, DTG, audits énergétiques, DPE collectifs, études de faisabilité, en particulier pour des copropriétés."}},{"@type":"Question","name":"Comment obtenir un accès ?","acceptedAnswer":{"@type":"Answer","text":"L'accès se fait sur invitation. Envoyez une demande depuis la page de connexion (lien « Demander un accès ») : l'administrateur crée votre compte et vous transmet vos identifiants. Il n'y a pas d'inscription libre."}},{"@type":"Question","name":"Quels fichiers DPE puis-je importer ?","acceptedAnswer":{"@type":"Answer","text":"Les exports Excel des DPE établis avec la méthode 3CL et les fichiers XML officiels de l'ADEME. Vous pouvez aussi rechercher un DPE par son numéro dans la base publique de l'ADEME pour en obtenir le résumé (étiquettes, consommations, déperditions, systèmes). Le détail des parois nécessite le fichier complet."}},{"@type":"Question","name":"Les autres utilisateurs voient-ils mes projets ?","acceptedAnswer":{"@type":"Answer","text":"Non. Chaque compte dispose d'un espace privé pour ses projets et ses DPE importés. Un projet n'est visible par un collègue que si vous le partagez avec lui, en lecture seule ou en modification. L'administrateur ne voit pas non plus les projets qui ne lui sont pas partagés. Seul le catalogue de prix est commun au bureau."}},{"@type":"Question","name":"Les résultats remplacent-ils un audit énergétique réglementaire ?","acceptedAnswer":{"@type":"Answer","text":"Non. La performance après travaux est estimée par une méthode simplifiée, et les aides sont calculées à partir des règles et montants paramétrés. Ces résultats servent à préparer et comparer les scénarios ; ils ne remplacent ni un calcul 3CL, ni un audit réglementaire, ni l'instruction officielle des dossiers d'aides."}},{"@type":"Question","name":"Faut-il installer un logiciel ?","acceptedAnswer":{"@type":"Answer","text":"Non. CheckChiffreBet fonctionne dans un navigateur récent (Chrome, Edge, Firefox ou Safari), sur ordinateur comme sur tablette. Les documents produits s'ouvrent avec Word, Excel ou tout lecteur PDF."}},{"@type":"Question","name":"Où sont hébergées les données ?","acceptedAnswer":{"@type":"Answer","text":"Les comptes et la base de données sont hébergés par Supabase dans l'Union européenne (Irlande). Les fichiers du site sont servis par GitHub Pages. Le détail figure dans la politique de confidentialité."}}]}]}</script>
 </head>
 <body>
@@ -273,6 +331,7 @@ h3{font-size:18px;font-weight:600;line-height:1.35}
         </ul>
       </div>
 
+      <div class="stage stage-hero" id="stage-hero">
       <figure class="mock-fig">
         <div class="mock" role="img" aria-label="Illustration de l'interface CheckChiffreBet sur un projet d'exemple fictif : étiquette énergie estimée qui passe de D à B après travaux, reste à charge moyen par lot et répartition des déperditions par poste.">
           <div class="mock-bar" aria-hidden="true"><i></i><i></i><i></i><span class="mock-url">checkchiffrebet.pro/app</span></div>
@@ -320,6 +379,30 @@ h3{font-size:18px;font-weight:600;line-height:1.35}
         </div>
         <figcaption class="mock-note">Illustration d'après l'interface réelle — projet d'exemple aux données fictives.</figcaption>
       </figure>
+      <div class="stage-canvas" role="img" aria-label="Illustration en 3D : un immeuble dont la façade apparaît telle quelle à gauche de la ligne et en vision thermique à droite, les pertes de chaleur allant du jaune (fortes) au violet (faibles). Exemple fictif."></div>
+      <div class="stage-ui">
+        <span class="chip chip-l" aria-hidden="true">Façade</span>
+        <span class="chip chip-r" aria-hidden="true">Vision thermique</span>
+        <div class="legend" aria-hidden="true"><span>Fortes</span><i></i><span>Faibles</span></div>
+        <div class="float-card" aria-hidden="true">
+          <div class="k">Étiquette énergie</div>
+          <div class="cls-row"><span class="cls cls-d">D</span><span class="arr">→</span><span class="cls cls-b">B</span><span class="gain">−66&nbsp;%</span></div>
+          <div class="s">estimation, exemple fictif</div>
+        </div>
+        <div class="split" role="slider" tabindex="0" aria-label="Comparer la façade et la vision thermique" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><span class="split-knob"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg></span></div>
+        <p class="stage-hint" aria-hidden="true">Faites glisser pour comparer</p>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats" aria-label="Chiffres clés">
+    <div class="wrap">
+      <div class="stats-grid">
+        <div class="stat"><p class="stat-n" data-count="205">205</p><p class="stat-l">postes de travaux dans le catalogue de prix partagé</p></div>
+        <div class="stat"><p class="stat-n" data-count="6">6</p><p class="stat-l">livrables prêts à l'emploi&nbsp;: DPGF, CCTP, rapports, présentation et résolutions d'AG</p></div>
+        <div class="stat"><p class="stat-n" data-count="4">4</p><p class="stat-l">rôles d'accès&nbsp;: administrateur, responsable BET, ingénieur et consultation</p></div>
+      </div>
     </div>
   </section>
 
@@ -435,12 +518,21 @@ h3{font-size:18px;font-weight:600;line-height:1.35}
         <p class="eyebrow">Comment ça marche</p>
         <h2 id="etapes-titre">Quatre étapes, de l'accès au livrable</h2>
       </div>
-      <ol class="steps">
+      <div class="steps-layout">
+      <div class="stage stage-steps" id="stage-steps" data-step="0">
+        <div class="stage-canvas" role="img" aria-label="Illustration en 3D : l'immeuble vu sous plusieurs angles, en façade, en vision thermique puis après travaux, au fil des quatre étapes."></div>
+        <div class="stage-ui">
+          <span class="chip chip-l stage-tag" aria-hidden="true">Façade</span>
+          <div class="split" aria-hidden="true"><span class="split-knob"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l-6 6 6 6M15 6l6 6-6 6"/></svg></span></div>
+        </div>
+      </div>
+      <ol class="steps" id="etapes-liste">
         <li class="step"><h3>Demandez un accès</h3><p>L'accès se fait sur invitation. Envoyez une <a href="/app#acces">demande d'accès</a>&nbsp;: l'administrateur crée votre compte et vous transmet vos identifiants.</p></li>
         <li class="step"><h3>Connectez-vous</h3><p>Identifiez-vous avec votre e-mail et votre mot de passe depuis un navigateur récent. La double authentification peut être activée.</p></li>
         <li class="step"><h3>Créez le projet et importez les DPE</h3><p>Renseignez l'immeuble et importez ses DPE&nbsp;: synthèse, déperditions et métrés par bâtiment sont générés automatiquement.</p></li>
         <li class="step"><h3>Chiffrez et remettez vos livrables</h3><p>Composez les scénarios, calculez les aides et le reste à charge, puis exportez DPGF, CCTP, rapport et présentation d'AG.</p></li>
       </ol>
+      </div>
     </div>
   </section>
 
@@ -541,5 +633,16 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&b.getAttrib
 var mq=window.matchMedia('(min-width:921px)');if(mq.addEventListener)mq.addEventListener('change',function(){set(false);});}
 try{if(localStorage.getItem('bet_chiffrage_auth')){document.querySelectorAll('[data-login]').forEach(function(a){a.childNodes.forEach(function(n){if(n.nodeType===3&&/Se connecter/.test(n.textContent))n.textContent=n.textContent.replace('Se connecter','Ouvrir mon espace');});});}}catch(e){}
 })();</script>
+<script>
+/* Animations : chargées après l'affichage de la page (GSAP, ScrollTrigger, puis assets/animations.js).
+   Rien n'est chargé si l'utilisateur a demandé moins d'animations ; la page reste complète sans ces scripts. */
+(function(){
+if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+var files=['/assets/libs/gsap.min.js','/assets/libs/ScrollTrigger.min.js','/assets/animations.js?v=1'];
+function next(i){if(i>=files.length)return;var s=document.createElement('script');s.src=files[i];s.onload=function(){next(i+1);};document.body.appendChild(s);}
+function go(){setTimeout(function(){next(0);},0);}
+if(document.readyState==='complete')go();else window.addEventListener('load',go);
+})();
+</script>
 </body>
 </html>
